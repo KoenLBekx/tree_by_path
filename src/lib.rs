@@ -31,7 +31,7 @@ impl<C> Node<C> {
     }
     */
 
-    pub fn add_cargo_under_path(&mut self, path: Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
+    pub fn add_cargo_under_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
         let mut return_path = path.clone();
         let borrowed = self.borrow_mut_node_by_path(path);
 
@@ -47,15 +47,15 @@ impl<C> Node<C> {
         }
     }
 
-    pub fn add_cargo_after_path(&mut self, mut path: Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
+    pub fn add_cargo_after_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
         if path.len() == 0 {
             return Err(cargo);
         }
 
-        let last_path = path.pop().unwrap() + 1;
         let mut return_path = path.clone();
+        let last_path = return_path.pop().unwrap() + 1;
 
-        let borrowed = self.borrow_mut_node_by_path(path);
+        let borrowed = self.borrow_mut_node_by_path(&return_path);
 
         match borrowed {
             None => Err(cargo),
@@ -72,15 +72,15 @@ impl<C> Node<C> {
         }
     }
 
-    pub fn add_cargo_before_path(&mut self, mut path: Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
+    pub fn add_cargo_before_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
         if path.len() == 0 {
             return Err(cargo);
         }
 
-        let last_path = path.pop().unwrap();
         let mut return_path = path.clone();
+        let last_path = return_path.pop().unwrap();
 
-        let borrowed = self.borrow_mut_node_by_path(path);
+        let borrowed = self.borrow_mut_node_by_path(&return_path);
 
         match borrowed {
             None => Err(cargo),
@@ -97,7 +97,7 @@ impl<C> Node<C> {
         }
     }
 
-    pub fn borrow_cargo_by_path(&self, path: Vec<usize>) -> Option<&C> {
+    pub fn borrow_cargo_by_path(&self, path: &Vec<usize>) -> Option<&C> {
         let borrowed = self.borrow_node_by_path(path);
 
         match borrowed {
@@ -106,7 +106,7 @@ impl<C> Node<C> {
         }
     }
 
-    pub fn borrow_mut_cargo_by_path(&mut self, path: Vec<usize>) -> Option<&mut C> {
+    pub fn borrow_mut_cargo_by_path(&mut self, path: &Vec<usize>) -> Option<&mut C> {
         let borrowed = self.borrow_mut_node_by_path(path);
 
         match borrowed {
@@ -115,7 +115,7 @@ impl<C> Node<C> {
         }
     }
 
-    fn borrow_node_by_path(&self, path: Vec<usize>) -> Option<&Node<C>> {
+    fn borrow_node_by_path(&self, path: &Vec<usize>) -> Option<&Node<C>> {
         let mut outcome: Option<&Node<C>> = Some(self);
         let mut pathix = 0usize;
         let path_len = path.len();
@@ -137,7 +137,7 @@ impl<C> Node<C> {
         outcome
     }
 
-    fn borrow_mut_node_by_path(&mut self, path: Vec<usize>) -> Option<&mut Node<C>> {
+    fn borrow_mut_node_by_path(&mut self, path: &Vec<usize>) -> Option<&mut Node<C>> {
         let mut outcome = Some(self);
         let mut pathix = 0usize;
         let path_len = path.len();
@@ -183,33 +183,33 @@ mod tests {
 
         let mut borrowed: Option<&Node<u8>>;
 
-        borrowed = n.borrow_node_by_path(Vec::<usize>::new());
+        borrowed = n.borrow_node_by_path(&Vec::<usize>::new());
         assert!(borrowed.is_some());
         assert_eq!(0, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_node_by_path(vec![1]);
+        borrowed = n.borrow_node_by_path(&vec![1]);
         assert!(borrowed.is_some());
         assert_eq!(2, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_node_by_path(vec![2]);
+        borrowed = n.borrow_node_by_path(&vec![2]);
         assert!(borrowed.is_some());
         assert_eq!(5, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_node_by_path(vec![3]);
+        borrowed = n.borrow_node_by_path(&vec![3]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_node_by_path(vec![1, 0]);
+        borrowed = n.borrow_node_by_path(&vec![1, 0]);
         assert!(borrowed.is_some());
         assert_eq!(3, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_node_by_path(vec![1, 1]);
+        borrowed = n.borrow_node_by_path(&vec![1, 1]);
         assert!(borrowed.is_some());
         assert_eq!(4, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_node_by_path(vec![1, 2]);
+        borrowed = n.borrow_node_by_path(&vec![1, 2]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_node_by_path(vec![1, 1, 0]);
+        borrowed = n.borrow_node_by_path(&vec![1, 1, 0]);
         assert!(borrowed.is_none());
     }
 
@@ -224,33 +224,33 @@ mod tests {
 
         let mut borrowed: Option<&mut Node<u8>>;
 
-        borrowed = n.borrow_mut_node_by_path(Vec::<usize>::new());
+        borrowed = n.borrow_mut_node_by_path(&Vec::<usize>::new());
         assert!(borrowed.is_some());
         assert_eq!(0, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_mut_node_by_path(vec![1]);
+        borrowed = n.borrow_mut_node_by_path(&vec![1]);
         assert!(borrowed.is_some());
         assert_eq!(2, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_mut_node_by_path(vec![2]);
+        borrowed = n.borrow_mut_node_by_path(&vec![2]);
         assert!(borrowed.is_some());
         assert_eq!(5, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_mut_node_by_path(vec![3]);
+        borrowed = n.borrow_mut_node_by_path(&vec![3]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_mut_node_by_path(vec![1, 0]);
+        borrowed = n.borrow_mut_node_by_path(&vec![1, 0]);
         assert!(borrowed.is_some());
         assert_eq!(3, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_mut_node_by_path(vec![1, 1]);
+        borrowed = n.borrow_mut_node_by_path(&vec![1, 1]);
         assert!(borrowed.is_some());
         assert_eq!(4, borrowed.unwrap().cargo);
 
-        borrowed = n.borrow_mut_node_by_path(vec![1, 2]);
+        borrowed = n.borrow_mut_node_by_path(&vec![1, 2]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_mut_node_by_path(vec![1, 1, 0]);
+        borrowed = n.borrow_mut_node_by_path(&vec![1, 1, 0]);
         assert!(borrowed.is_none());
     }
 
@@ -265,33 +265,33 @@ mod tests {
 
         let mut borrowed: Option<&u8>;
 
-        borrowed = n.borrow_cargo_by_path(Vec::<usize>::new());
+        borrowed = n.borrow_cargo_by_path(&Vec::<usize>::new());
         assert!(borrowed.is_some());
         assert_eq!(&0, borrowed.unwrap());
 
-        borrowed = n.borrow_cargo_by_path(vec![1]);
+        borrowed = n.borrow_cargo_by_path(&vec![1]);
         assert!(borrowed.is_some());
         assert_eq!(&2, borrowed.unwrap());
 
-        borrowed = n.borrow_cargo_by_path(vec![2]);
+        borrowed = n.borrow_cargo_by_path(&vec![2]);
         assert!(borrowed.is_some());
         assert_eq!(&5, borrowed.unwrap());
 
-        borrowed = n.borrow_cargo_by_path(vec![3]);
+        borrowed = n.borrow_cargo_by_path(&vec![3]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_cargo_by_path(vec![1, 0]);
+        borrowed = n.borrow_cargo_by_path(&vec![1, 0]);
         assert!(borrowed.is_some());
         assert_eq!(&3, borrowed.unwrap());
 
-        borrowed = n.borrow_cargo_by_path(vec![1, 1]);
+        borrowed = n.borrow_cargo_by_path(&vec![1, 1]);
         assert!(borrowed.is_some());
         assert_eq!(&4, borrowed.unwrap());
 
-        borrowed = n.borrow_cargo_by_path(vec![1, 2]);
+        borrowed = n.borrow_cargo_by_path(&vec![1, 2]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_cargo_by_path(vec![1, 1, 0]);
+        borrowed = n.borrow_cargo_by_path(&vec![1, 1, 0]);
         assert!(borrowed.is_none());
     }
 
@@ -306,33 +306,33 @@ mod tests {
 
         let mut borrowed: Option<&mut u8>;
 
-        borrowed = n.borrow_mut_cargo_by_path(Vec::<usize>::new());
+        borrowed = n.borrow_mut_cargo_by_path(&Vec::<usize>::new());
         assert!(borrowed.is_some());
         assert_eq!(&mut 0, borrowed.unwrap());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![1]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1]);
         assert!(borrowed.is_some());
         assert_eq!(&mut 2, borrowed.unwrap());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![2]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![2]);
         assert!(borrowed.is_some());
         assert_eq!(&mut 5, borrowed.unwrap());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![3]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![3]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![1, 0]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1, 0]);
         assert!(borrowed.is_some());
         assert_eq!(&mut 3, borrowed.unwrap());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![1, 1]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1, 1]);
         assert!(borrowed.is_some());
         assert_eq!(&mut 4, borrowed.unwrap());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![1, 2]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1, 2]);
         assert!(borrowed.is_none());
 
-        borrowed = n.borrow_mut_cargo_by_path(vec![1, 1, 0]);
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1, 1, 0]);
         assert!(borrowed.is_none());
     }
 
@@ -341,31 +341,31 @@ mod tests {
         let mut n = Node::new(0u8);
         let mut result: Result<Vec<usize>, u8>;
 
-        result = n.add_cargo_under_path(vec![], 1);
+        result = n.add_cargo_under_path(&vec![], 1);
         assert!(result.is_ok());
         assert_eq!(vec![0], result.unwrap());
 
-        result = n.add_cargo_under_path(vec![], 2);
+        result = n.add_cargo_under_path(&vec![], 2);
         assert!(result.is_ok());
         assert_eq!(vec![1], result.unwrap());
 
-        result = n.add_cargo_under_path(vec![0], 3);
+        result = n.add_cargo_under_path(&vec![0], 3);
         assert!(result.is_ok());
         assert_eq!(vec![0, 0], result.unwrap());
 
-        result = n.add_cargo_under_path(vec![0], 4);
+        result = n.add_cargo_under_path(&vec![0], 4);
         assert!(result.is_ok());
         assert_eq!(vec![0, 1], result.unwrap());
 
-        let borrowed = n.borrow_cargo_by_path(vec![0, 1]);
+        let borrowed = n.borrow_cargo_by_path(&vec![0, 1]);
         assert!(borrowed.is_some());
         assert_eq!(&4, borrowed.unwrap());
 
-        result = n.add_cargo_under_path(vec![50], 99);
+        result = n.add_cargo_under_path(&vec![50], 99);
         assert!(result.is_err());
         assert_eq!(99, result.unwrap_err());
 
-        result = n.add_cargo_under_path(vec![0, 1, 1], 99);
+        result = n.add_cargo_under_path(&vec![0, 1, 1], 99);
         assert!(result.is_err());
         assert_eq!(99, result.unwrap_err());
     }
@@ -375,7 +375,7 @@ mod tests {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, i8>;
 
-        result = n.add_cargo_after_path(vec![], -38);
+        result = n.add_cargo_after_path(&vec![], -38);
         assert!(result.is_err());
         assert_eq!(-38, result.unwrap_err());
     }
@@ -386,24 +386,24 @@ mod tests {
         let mut result: Result<Vec<usize>, i8>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_cargo_after_path(vec![0], 1);
+        result = n.add_cargo_after_path(&vec![0], 1);
         assert!(result.is_err());
         assert_eq!(1, result.unwrap_err());
 
-        n.add_cargo_under_path(vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
 
-        result = n.add_cargo_after_path(vec![0], 2);
+        result = n.add_cargo_after_path(&vec![0], 2);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
-        assert_eq!(&2, n.borrow_cargo_by_path(result_path).unwrap());
+        assert_eq!(&2, n.borrow_cargo_by_path(&result_path).unwrap());
 
-        result = n.add_cargo_after_path(vec![0], 3);
+        result = n.add_cargo_after_path(&vec![0], 3);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
-        assert_eq!(&3, n.borrow_cargo_by_path(result_path).unwrap());
-        assert_eq!(&2, n.borrow_cargo_by_path(vec![2]).unwrap());
+        assert_eq!(&3, n.borrow_cargo_by_path(&result_path).unwrap());
+        assert_eq!(&2, n.borrow_cargo_by_path(&vec![2]).unwrap());
     }
 
     #[test]
@@ -411,7 +411,7 @@ mod tests {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, i8>;
 
-        result = n.add_cargo_before_path(vec![], -38);
+        result = n.add_cargo_before_path(&vec![], -38);
         assert!(result.is_err());
         assert_eq!(-38, result.unwrap_err());
     }
@@ -422,33 +422,33 @@ mod tests {
         let mut result: Result<Vec<usize>, i8>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_cargo_before_path(vec![0], 1);
+        result = n.add_cargo_before_path(&vec![0], 1);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
-        assert_eq!(&1, n.borrow_cargo_by_path(result_path).unwrap());
+        assert_eq!(&1, n.borrow_cargo_by_path(&result_path).unwrap());
 
-        result = n.add_cargo_before_path(vec![0], 2);
+        result = n.add_cargo_before_path(&vec![0], 2);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
-        assert_eq!(&2, n.borrow_cargo_by_path(result_path).unwrap());
-        assert_eq!(&1, n.borrow_cargo_by_path(vec![1]).unwrap());
+        assert_eq!(&2, n.borrow_cargo_by_path(&result_path).unwrap());
+        assert_eq!(&1, n.borrow_cargo_by_path(&vec![1]).unwrap());
 
-        result = n.add_cargo_before_path(vec![1], 3);
+        result = n.add_cargo_before_path(&vec![1], 3);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
-        assert_eq!(&3, n.borrow_cargo_by_path(result_path).unwrap());
-        assert_eq!(&1, n.borrow_cargo_by_path(vec![2]).unwrap());
+        assert_eq!(&3, n.borrow_cargo_by_path(&result_path).unwrap());
+        assert_eq!(&1, n.borrow_cargo_by_path(&vec![2]).unwrap());
 
-        result = n.add_cargo_before_path(vec![0, 0], 4);
+        result = n.add_cargo_before_path(&vec![0, 0], 4);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0, 0], result_path);
-        assert_eq!(&4, n.borrow_cargo_by_path(result_path).unwrap());
+        assert_eq!(&4, n.borrow_cargo_by_path(&result_path).unwrap());
 
-        result = n.add_cargo_before_path(vec![2, 1], 5);
+        result = n.add_cargo_before_path(&vec![2, 1], 5);
         assert!(result.is_err());
         assert_eq!(5, result.unwrap_err());
     }
