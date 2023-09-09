@@ -3,6 +3,12 @@ pub struct Node<C> {
     children: Vec<Node<C>>,
 }
 
+pub enum PathResult {
+    Ok(Vec<usize>),
+    RequestedPathNotAvailable,
+    InputPathNotFound,
+}
+
 impl<C> Node<C> {
     pub fn new(cargo: C) -> Node<C> {
         Node {
@@ -10,6 +16,20 @@ impl<C> Node<C> {
             children: Vec::<Node<C>>::new(),
         }
     }
+
+    pub fn get_first_path(&self) -> Vec<usize> {
+        vec![]
+    }
+
+    /*
+    pub fn get_next_path(&self, path: &Vec<usize>) -> PathResult {
+        let mut return_path = path.clone();
+
+        match self.borrow_node_by_path {
+            
+        }
+    }
+    */
 
     pub fn add_cargo_under_path(&mut self, path: Vec<usize>, cargo: C) -> Result<Vec<usize>, C> {
         let mut return_path = path.clone();
