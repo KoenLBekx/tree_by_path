@@ -24,6 +24,30 @@ impl<C> Node<C> {
         vec![]
     }
 
+    pub fn get_last_path(&self) -> Result<Vec<usize>, PathError> {
+        let mut nd = self;
+        let mut result_path = Vec::<usize>::new();
+        let mut child_count: usize;
+
+        loop {
+            child_count = nd.children.len();
+
+            if child_count == 0 {
+                break;
+            } else {
+                child_count -= 1;
+                nd = &nd.children[child_count];
+                result_path.push(child_count);
+            }
+        }
+
+        if result_path.len() == 0 {
+            return Err(PathError::RequestedPathNotAvailable);
+        }
+
+        Ok(result_path)
+    }
+
     pub fn get_next_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
         let mut result_path = path.clone();
 
@@ -440,6 +464,7 @@ mod tests {
         result = n.add_cargo_under_path(&vec![], 2);
         assert!(result.is_ok());
         assert_eq!(vec![1], result.unwrap());
+        assert_eq!(&2, n.borrow_cargo_by_path(&vec![1]).unwrap());
 
         result = n.add_cargo_under_path(&vec![0], 3);
         assert!(result.is_ok());
@@ -720,5 +745,34 @@ mod tests {
         previous = path_result.unwrap();
         assert_eq!(Vec::<usize>::new(), previous);
         assert_eq!(&0, n.borrow_cargo_by_path(&previous).unwrap());
+    }
+
+    #[test]
+    fn node_get_last_path_on_lone_root() {
+        let n = Node::new('K');
+        let result = n.get_last_path();
+        assert!(result.is_err());
+        assert_eq!(Err(PathError::RequestedPathNotAvailable), result);
+    }
+
+    #[test]
+    fn node_get_last_path_on_lone_child() {
+        let mut n = Node::new('K');
+        n.add_cargo_under_path(&vec![], 'Z').unwrap();
+        let result = n.get_last_path();
+        assert!(result.is_ok());
+        assert_eq!(Ok(vec![0usize]), result);
+    }
+
+    #[test]
+    fn node_get_last_path_on_first_level() {
+        let mut n = Node::new('A');
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        let result = n.get_last_path();
+        assert!(result.is_ok());
+        assert_eq!(Ok(vec![2usize]), result);
+        assert_eq!(&'D', n.borrow_cargo_by_path(&vec![2]).unwrap());
     }
 }
