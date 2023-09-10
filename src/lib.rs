@@ -389,9 +389,12 @@ mod tests {
 
         let mut borrowed: Option<&mut u8>;
 
-        borrowed = n.borrow_mut_cargo_by_path(&Vec::<usize>::new());
-        assert!(borrowed.is_some());
-        assert_eq!(&mut 0, borrowed.unwrap());
+        // Check if we can read twice.
+        for _i in 0..2 {
+            borrowed = n.borrow_mut_cargo_by_path(&Vec::<usize>::new());
+            assert!(borrowed.is_some());
+            assert_eq!(&mut 0, borrowed.unwrap());
+        }
 
         borrowed = n.borrow_mut_cargo_by_path(&vec![1]);
         assert!(borrowed.is_some());
@@ -408,9 +411,15 @@ mod tests {
         assert!(borrowed.is_some());
         assert_eq!(&mut 3, borrowed.unwrap());
 
+        // Check if we can change the cargo.
         borrowed = n.borrow_mut_cargo_by_path(&vec![1, 1]);
         assert!(borrowed.is_some());
-        assert_eq!(&mut 4, borrowed.unwrap());
+        let unwrapped = borrowed.unwrap();
+        assert_eq!(&mut 4, unwrapped);
+        *unwrapped = 40;
+        borrowed = n.borrow_mut_cargo_by_path(&vec![1, 1]);
+        assert!(borrowed.is_some());
+        assert_eq!(&mut 40, borrowed.unwrap());
 
         borrowed = n.borrow_mut_cargo_by_path(&vec![1, 2]);
         assert!(borrowed.is_none());
