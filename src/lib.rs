@@ -2,31 +2,6 @@ pub struct Node<C> {
     cargo: C,
     children: Vec<Node<C>>,
 }
-
-#[derive(PartialEq)]
-#[derive(Debug)]
-pub enum PathResult {
-    Found(Vec<usize>),
-    RequestedPathNotAvailable,
-    InputPathNotFound,
-    ProcessError,
-}
-impl PathResult {
-    pub fn is_found(&self) -> bool {
-        match self {
-            PathResult::Found(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn unwrap(self) -> Vec<usize> {
-        match self {
-            PathResult::Found(path) => path,
-            _ => panic!("The unwrap() method musn't be called on a PathResult that's not an Found variant. Check using the is_found() method first."),
-        }
-    }
-}
-
 impl<C> Node<C> {
     pub fn new(cargo: C) -> Node<C> {
         Node {
@@ -71,6 +46,45 @@ impl<C> Node<C> {
                             },
                         }
                     }
+                }
+            },
+        }
+    }
+
+    pub fn get_previous_path(&self, path: &Vec<usize>) -> PathResult {
+        if path.len() == 0 {
+            return PathResult::RequestedPathNotAvailable;
+        }
+
+        let mut return_path = path.clone();
+
+        match self.borrow_node_by_path(&return_path) {
+            None => PathResult::InputPathNotFound,
+            Some(_) => {
+                let input_index = return_path.pop().unwrap();
+                let mut children_count: usize;
+
+                if input_index > 0 {
+                    return_path.push(input_index - 1);
+
+                    // Descend do deepest last grandchild of this node.
+                    loop {
+                        match self.borrow_node_by_path(&return_path) {
+                            None => break PathResult::ProcessError,
+                            Some(nd) => {
+                                    children_count = nd.children.len();
+
+                                    if children_count > 0 {
+                                        return_path.push(children_count -1);
+                                    } else {
+                                        break PathResult::Found(return_path);
+                                    }
+                            },
+                        }
+                    }
+                } else  {
+                    // Return parent's path.
+                    PathResult::Found(return_path)
                 }
             },
         }
@@ -202,6 +216,30 @@ impl<C> Node<C> {
         }
 
         outcome
+    }
+}
+
+#[derive(PartialEq)]
+#[derive(Debug)]
+pub enum PathResult {
+    Found(Vec<usize>),
+    RequestedPathNotAvailable,
+    InputPathNotFound,
+    ProcessError,
+}
+impl PathResult {
+    pub fn is_found(&self) -> bool {
+        match self {
+            PathResult::Found(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn unwrap(self) -> Vec<usize> {
+        match self {
+            PathResult::Found(path) => path,
+            _ => panic!("The unwrap() method musn't be called on a PathResult that's not an Found variant. Check using the is_found() method first."),
+        }
     }
 }
 
@@ -588,5 +626,90 @@ mod tests {
         n.add_cargo_under_path(&vec![1], 3).unwrap();
         n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
         assert_eq!(PathResult::RequestedPathNotAvailable, n.get_next_path(&vec![1, 0, 0]));
+    }
+
+    #[test]
+    fn node_get_previous_path_from_unexistent() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
+        assert_eq!(PathResult::InputPathNotFound, n.get_next_path(&vec![3, 0, 0]));
+    }
+
+    #[test]
+    fn node_get_previous_path_from_root() {
+        let n = Node::new(String::from("aaa"));
+        assert_eq!(PathResult::RequestedPathNotAvailable, n.get_previous_path(&vec![]));
+    }
+
+    #[test]
+    fn node_get_previous_path() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
+        n.add_cargo_after_path(&vec![1], 5).unwrap();
+        n.add_cargo_after_path(&vec![2], 6).unwrap();
+        n.add_cargo_after_path(&vec![1, 0], 50).unwrap();
+        n.add_cargo_under_path(&vec![1, 1], 51).unwrap();
+        n.add_cargo_after_path(&vec![1, 1, 0], 52).unwrap();
+
+        /*
+         *  0
+         *  |
+         *  1--2----------5--6
+         *     |
+         *     3--50
+         *     |  |
+         *     4  51--52
+        */
+
+        let mut path_result: PathResult;
+        let mut previous: Vec<usize>;
+
+        // Descend to last grandchild under previous sibling.
+        path_result = n.get_previous_path(&vec![2]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(vec![1, 1, 1], previous);
+        assert_eq!(&52, n.borrow_cargo_by_path(&previous).unwrap());
+
+        // Descend to last grandchild under previous sibling (bis)
+        path_result = n.get_previous_path(&vec![1, 1]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(vec![1, 0, 0], previous);
+        assert_eq!(&4, n.borrow_cargo_by_path(&previous).unwrap());
+
+        // Find previous sibling
+        path_result = n.get_previous_path(&vec![1, 1, 1]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(vec![1, 1, 0], previous);
+        assert_eq!(&51, n.borrow_cargo_by_path(&previous).unwrap());
+
+        // Find previous sibling (bis)
+        path_result = n.get_previous_path(&vec![1]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(vec![0], previous);
+        assert_eq!(&1, n.borrow_cargo_by_path(&previous).unwrap());
+
+        // Find non-root parent
+        path_result = n.get_previous_path(&vec![1, 1, 0]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(vec![1, 1], previous);
+        assert_eq!(&50, n.borrow_cargo_by_path(&previous).unwrap());
+        
+        // Find root parent
+        path_result = n.get_previous_path(&vec![0]);
+        assert!(path_result.is_found());
+        previous = path_result.unwrap();
+        assert_eq!(Vec::<usize>::new(), previous);
+        assert_eq!(&0, n.borrow_cargo_by_path(&previous).unwrap());
     }
 }
