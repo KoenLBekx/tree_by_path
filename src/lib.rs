@@ -1,6 +1,4 @@
 // TODO : implement methods
-// - get_last_path
-// - extract_node
 // - insert_node
 // - swap_node
 // TODO : implement trait Iterator
@@ -8,6 +6,7 @@
 // - if impossible, implement
 //  - traverse
 //  - traverse_retro
+
 pub struct Node<C> {
     cargo: C,
     children: Vec<Node<C>>,
@@ -142,7 +141,7 @@ impl<C> Node<C> {
 
     pub fn add_cargo_after_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
-            return Err((PathError::RequestedPathNotAvailable, cargo));
+            return Err((PathError::InputPathNotFitForOperation, cargo));
         }
 
         let mut result_path = path.clone();
@@ -167,7 +166,7 @@ impl<C> Node<C> {
 
     pub fn add_cargo_before_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
-            return Err((PathError::RequestedPathNotAvailable, cargo));
+            return Err((PathError::InputPathNotFitForOperation, cargo));
         }
 
         let mut result_path = path.clone();
@@ -190,11 +189,26 @@ impl<C> Node<C> {
         }
     }
 
-    /*
-    pub fn delete_node_by_path(&mut self, path: &Vec<usize>) -> Result<Node<C>, PathError> {
+    pub fn extract_node_by_path(&mut self, path: &Vec<usize>) -> Result<Node<C>, PathError> {
+        if path.len() == 0 {
+            return Err(PathError::InputPathNotFitForOperation);
+        }
 
+        let mut parent_path = path.clone();
+        let last_index = parent_path.pop().unwrap();
+        let parent_result = self.borrow_mut_node_by_path(&parent_path);
+
+        match parent_result {
+            Err(err) => Err(err),
+            Ok(parent) => {
+                if parent.children.len() <= last_index {
+                    Err(PathError::InputPathNotFound)
+                } else {
+                    Ok(parent.children.remove(last_index))
+                }
+            },
+        }
     }
-    */
 
     pub fn borrow_cargo_by_path(&self, path: &Vec<usize>) -> Result<&C, PathError> {
         let borrowed = self.borrow_node_by_path(path);
@@ -212,6 +226,10 @@ impl<C> Node<C> {
             Ok(nd) => Ok(&mut nd.cargo),
             Err(err) => Err(err),
         }
+    }
+
+    pub fn has_path(&self, path: &Vec<usize>) -> bool {
+        self.borrow_node_by_path(path).is_ok()
     }
 
     fn borrow_node_by_path(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
@@ -263,6 +281,7 @@ impl<C> Node<C> {
 #[derive(Debug)]
 pub enum PathError {
     InputPathNotFound,
+    InputPathNotFitForOperation,
     RequestedPathNotAvailable,
     ProcessError,
 }
@@ -494,7 +513,7 @@ mod tests {
 
         result = n.add_cargo_after_path(&vec![], -38);
         assert!(result.is_err());
-        assert_eq!((PathError::RequestedPathNotAvailable, -38), result.unwrap_err());
+        assert_eq!((PathError::InputPathNotFitForOperation, -38), result.unwrap_err());
     }
 
     #[test]
@@ -530,7 +549,7 @@ mod tests {
 
         result = n.add_cargo_before_path(&vec![], -38);
         assert!(result.is_err());
-        assert_eq!((PathError::RequestedPathNotAvailable,-38), result.unwrap_err());
+        assert_eq!((PathError::InputPathNotFitForOperation,-38), result.unwrap_err());
     }
 
     #[test]
@@ -774,5 +793,84 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(Ok(vec![2usize]), result);
         assert_eq!(&'D', n.borrow_cargo_by_path(&vec![2]).unwrap());
+    }
+
+    #[test]
+    fn node_extract_node_by_path_root() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
+        let result = n.extract_node_by_path(&n.get_first_path());
+        assert!(result.is_err());
+
+        // This assertion requires Debug and PartialEq to be implemented on the specific Node<SubType>,
+        // thus limiting the cargo types to Debug and PartialEq implementers.
+        // assert_eq!(PathError::InputPathNotFitForOperation, result.unwrap_err())_;
+        
+        match result {
+            Err(PathError::InputPathNotFitForOperation) => (),
+            _ => panic!("Extracting the root node should result in a Result::Err(PathError::InputPathNotFitForOperation) return value."),
+        }
+    }
+
+    #[test]
+    fn node_extract_node_by_path_nonexistent() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
+        let result = n.extract_node_by_path(&vec![0, 3]);
+        
+        match result {
+            Err(PathError::InputPathNotFound) => (),
+            _ => panic!("Extracting a non-existent node should result in a Result::Err(PathError::InputPathNotFound) return value."),
+        }
+    }
+
+    #[test]
+    fn node_extract_node_by_path_lone_leaf() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
+        let result = n.extract_node_by_path(&vec![0]);
+        
+        match result {
+            Ok(nd) => assert_eq!(1, nd.cargo),
+            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
+        }
+    }
+
+    #[test]
+    fn node_extract_node_by_path_lone_non_leaf() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
+        n.add_cargo_under_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![0], 3).unwrap();
+        let result = n.extract_node_by_path(&vec![0]);
+        
+        match result {
+            Ok(nd) => {
+                assert_eq!(1, nd.cargo);
+                assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
+            },
+            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
+        }
+    }
+
+    #[test]
+    fn node_extract_node_by_path_non_leaf() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&vec![], 90).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 91).unwrap();
+        n.add_cargo_under_path(&vec![1], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        let result = n.extract_node_by_path(&vec![1]);
+        
+        match result {
+            Ok(nd) => {
+                assert_eq!(1, nd.cargo);
+                assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
+                assert!(!n.has_path(&vec![2]));
+                assert_eq!(&91, n.borrow_cargo_by_path(&vec![1]).unwrap());
+            },
+            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
+        }
     }
 }
