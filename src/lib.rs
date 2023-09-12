@@ -7,6 +7,8 @@
 //  - traverse
 //  - traverse_retro
 
+#[derive(Debug)]
+#[derive(PartialEq)]
 pub struct Node<C> {
     cargo: C,
     children: Vec<Node<C>>,
@@ -206,6 +208,22 @@ impl<C> Node<C> {
                 } else {
                     Ok(parent.children.remove(last_index))
                 }
+            },
+        }
+    }
+
+    pub fn insert_node_under_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
+        let mut result_path = path.clone();
+        let borrowed = self.borrow_mut_node_by_path(path);
+
+        match borrowed {
+            Err(err) => Err((err, node)),
+            Ok(nd) =>  {
+                let ix = nd.children.len();
+                result_path.push(ix);
+                nd.children.push(node);
+
+                Ok(result_path)
             },
         }
     }
@@ -801,15 +819,7 @@ mod tests {
         n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node_by_path(&n.get_first_path());
         assert!(result.is_err());
-
-        // This assertion requires Debug and PartialEq to be implemented on the specific Node<SubType>,
-        // thus limiting the cargo types to Debug and PartialEq implementers.
-        // assert_eq!(PathError::InputPathNotFitForOperation, result.unwrap_err())_;
-        
-        match result {
-            Err(PathError::InputPathNotFitForOperation) => (),
-            _ => panic!("Extracting the root node should result in a Result::Err(PathError::InputPathNotFitForOperation) return value."),
-        }
+        assert_eq!(PathError::InputPathNotFitForOperation, result.unwrap_err());
     }
 
     #[test]
@@ -817,11 +827,8 @@ mod tests {
         let mut n = Node::new(0u8);
         n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node_by_path(&vec![0, 3]);
-        
-        match result {
-            Err(PathError::InputPathNotFound) => (),
-            _ => panic!("Extracting a non-existent node should result in a Result::Err(PathError::InputPathNotFound) return value."),
-        }
+        assert!(result.is_err());
+        assert_eq!(PathError::InputPathNotFound, result.unwrap_err());
     }
 
     #[test]
@@ -829,11 +836,9 @@ mod tests {
         let mut n = Node::new(0u8);
         n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node_by_path(&vec![0]);
-        
-        match result {
-            Ok(nd) => assert_eq!(1, nd.cargo),
-            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
-        }
+        assert!(result.is_ok());
+        let nd = result.unwrap();
+        assert_eq!(1, nd.cargo);
     }
 
     #[test]
@@ -843,14 +848,10 @@ mod tests {
         n.add_cargo_under_path(&vec![0], 2).unwrap();
         n.add_cargo_under_path(&vec![0], 3).unwrap();
         let result = n.extract_node_by_path(&vec![0]);
-        
-        match result {
-            Ok(nd) => {
-                assert_eq!(1, nd.cargo);
-                assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
-            },
-            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
-        }
+        assert!(result.is_ok());
+        let nd = result.unwrap();
+        assert_eq!(1, nd.cargo);
+        assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
     }
 
     #[test]
@@ -862,15 +863,38 @@ mod tests {
         n.add_cargo_under_path(&vec![1], 2).unwrap();
         n.add_cargo_under_path(&vec![1], 3).unwrap();
         let result = n.extract_node_by_path(&vec![1]);
-        
-        match result {
-            Ok(nd) => {
-                assert_eq!(1, nd.cargo);
-                assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
-                assert!(!n.has_path(&vec![2]));
-                assert_eq!(&91, n.borrow_cargo_by_path(&vec![1]).unwrap());
-            },
-            _ => panic!("Extracting an existent node should result in an Ok(Node<C>) return value."),
-        }
+        assert!(result.is_ok());
+        let nd = result.unwrap();
+        assert_eq!(1, nd.cargo);
+        assert!(nd.borrow_cargo_by_path(&vec![1]).is_ok());
+        assert!(!n.has_path(&vec![2]));
+        assert_eq!(&91, n.borrow_cargo_by_path(&vec![1]).unwrap());
+    }
+
+    #[test]
+    fn node_insert_node_under_nonexistent_path() {
+        let mut n = Node::new(0u8);
+        let n1 = Node::new(1u8);
+        let result: Result<Vec<usize>, (PathError, Node<u8>)>;
+
+        result = n.insert_node_under_path(&vec![2, 4], n1);
+        assert!(result.is_err());
+        let (err, bounced_node) = result.unwrap_err();
+        assert_eq!(PathError::InputPathNotFound, err);
+        assert_eq!(&1u8, bounced_node.borrow_cargo_by_path(&vec![]).unwrap());
+    }
+
+    #[test]
+    fn node_insert_node_under_path() {
+        let mut n = Node::new(0u8);
+        let n1 = Node::new(1u8);
+        let mut result: Result<Vec<usize>, (PathError, Node<u8>)>;
+        let mut result_path: Vec<usize>;
+
+        result = n.insert_node_under_path(&vec![], n1);
+        assert!(result.is_ok());
+        result_path = result.unwrap();
+        assert_eq!(vec![0], result_path);
+        assert_eq!(&1, n.borrow_cargo_by_path(&result_path).unwrap());
     }
 }
