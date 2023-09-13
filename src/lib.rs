@@ -1,5 +1,4 @@
 // TODO : implement methods
-// - add_node
 // - swap_node
 // TODO : implement trait Iterator
 // - and backwards iterator
@@ -243,6 +242,31 @@ impl<C> Node<C> {
             Ok(nd) =>  {
                 if last_path > nd.children.len() {
                     Err((PathError::RequestedPathNotAvailable, node))
+                } else {
+                    nd.children.insert(last_path, node);
+                    result_path.push(last_path);
+
+                    Ok(result_path)
+                }
+            },
+        }
+    }
+
+    pub fn add_node_before_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
+        if path.len() == 0 {
+            return Err((PathError::InputPathNotFitForOperation, node));
+        }
+
+        let mut result_path = path.clone();
+        let last_path = result_path.pop().unwrap();
+
+        let borrowed = self.borrow_mut_node_by_path(&result_path);
+
+        match borrowed {
+            Err(err) => Err((err, node)),
+            Ok(nd) =>  {
+                if last_path > nd.children.len() {
+                    Err((PathError::InputPathNotFound, node))
                 } else {
                     nd.children.insert(last_path, node);
                     result_path.push(last_path);
@@ -913,8 +937,8 @@ mod tests {
     fn node_add_node_under_path() {
         let mut n = Node::new(0u8);
         let n1 = Node::new(1u8);
-        let mut result: Result<Vec<usize>, (PathError, Node<u8>)>;
-        let mut result_path: Vec<usize>;
+        let result: Result<Vec<usize>, (PathError, Node<u8>)>;
+        let result_path: Vec<usize>;
 
         result = n.add_node_under_path(&vec![], n1);
         assert!(result.is_ok());
@@ -961,5 +985,52 @@ mod tests {
         assert_eq!(vec![1], result_path);
         assert_eq!(&3, n.borrow_cargo_by_path(&result_path).unwrap());
         assert_eq!(&2, n.borrow_cargo_by_path(&vec![2]).unwrap());
+    }
+
+    #[test]
+    fn node_add_node_before_path_empty() {
+        let mut n = Node::new(0i8);
+        let result: Result<Vec<usize>, (PathError, Node<i8>)>;
+
+        result = n.add_node_before_path(&vec![], Node::new(-38));
+        assert!(result.is_err());
+        assert_eq!((PathError::InputPathNotFitForOperation, Node::new(-38)), result.unwrap_err());
+    }
+
+    #[test]
+    fn node_add_node_before_path() {
+        let mut n = Node::new(0i8);
+        let mut result: Result<Vec<usize>, (PathError, Node<i8>)>;
+        let mut result_path: Vec<usize>;
+
+        result = n.add_node_before_path(&vec![0], Node::new(1));
+        assert!(result.is_ok());
+        result_path = result.unwrap();
+        assert_eq!(vec![0], result_path);
+        assert_eq!(&1, n.borrow_cargo_by_path(&result_path).unwrap());
+
+        result = n.add_node_before_path(&vec![0], Node::new(2));
+        assert!(result.is_ok());
+        result_path = result.unwrap();
+        assert_eq!(vec![0], result_path);
+        assert_eq!(&2, n.borrow_cargo_by_path(&result_path).unwrap());
+        assert_eq!(&1, n.borrow_cargo_by_path(&vec![1]).unwrap());
+
+        result = n.add_node_before_path(&vec![1], Node::new(3));
+        assert!(result.is_ok());
+        result_path = result.unwrap();
+        assert_eq!(vec![1], result_path);
+        assert_eq!(&3, n.borrow_cargo_by_path(&result_path).unwrap());
+        assert_eq!(&1, n.borrow_cargo_by_path(&vec![2]).unwrap());
+
+        result = n.add_node_before_path(&vec![0, 0], Node::new(4));
+        assert!(result.is_ok());
+        result_path = result.unwrap();
+        assert_eq!(vec![0, 0], result_path);
+        assert_eq!(&4, n.borrow_cargo_by_path(&result_path).unwrap());
+
+        result = n.add_node_before_path(&vec![2, 1], Node::new(5));
+        assert!(result.is_err());
+        assert_eq!((PathError::InputPathNotFound, Node::new(5)), result.unwrap_err());
     }
 }
