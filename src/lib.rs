@@ -1,5 +1,3 @@
-// TODO : implement methods
-// - swap_node
 // TODO : implement trait Iterator
 // - and backwards iterator
 // - if impossible, implement
@@ -272,6 +270,31 @@ impl<C> Node<C> {
                     result_path.push(last_path);
 
                     Ok(result_path)
+                }
+            },
+        }
+    }
+
+    pub fn swap_node_by_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Node<C>, (PathError, Node<C>)> {
+        if path.len() == 0 {
+            return Err((PathError::InputPathNotFitForOperation, node));
+        }
+
+        let mut parent_path = path.clone();
+        let last_path = parent_path.pop().unwrap();
+
+        let borrowed = self.borrow_mut_node_by_path(&parent_path);
+
+        match borrowed {
+            Err(err) => Err((err, node)),
+            Ok(nd) =>  {
+                if last_path >= nd.children.len() {
+                    Err((PathError::InputPathNotFound, node))
+                } else {
+                    let removed_node = nd.children.remove(last_path);
+                    nd.children.insert(last_path, node);
+
+                    Ok(removed_node)
                 }
             },
         }
@@ -1032,5 +1055,56 @@ mod tests {
         result = n.add_node_before_path(&vec![2, 1], Node::new(5));
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFound, Node::new(5)), result.unwrap_err());
+    }
+    
+    #[test]
+    fn node_swap_node_by_path_root() {
+        let mut n = Node::new(0u8);
+        let to_swap = Node::new(1u8);
+        let result = n.swap_node_by_path(&vec![], to_swap);
+        assert!(result.is_err());
+        let (err, bounced_node) = result.unwrap_err();
+        assert_eq!(PathError::InputPathNotFitForOperation, err);
+        assert_eq!(&1u8, bounced_node.borrow_cargo_by_path(&vec![]).unwrap());
+    }
+
+    #[test]
+    fn node_swap_node_by_path_unexistent() {
+        let mut n = Node::new(0u8);
+        let to_swap = Node::new(1u8);
+        let result = n.swap_node_by_path(&vec![8], to_swap);
+        assert!(result.is_err());
+        let (err, bounced_node) = result.unwrap_err();
+        assert_eq!(PathError::InputPathNotFound, err);
+        assert_eq!(&1u8, bounced_node.borrow_cargo_by_path(&vec![]).unwrap());
+    }
+    
+    #[test]
+    fn node_swap_node_by_path() {
+        let mut n = Node::new(0u8);
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 20).unwrap();
+        n.add_cargo_under_path(&vec![1], 21).unwrap();
+        n.add_cargo_under_path(&vec![1], 22).unwrap();
+
+        let mut to_swap = Node::new(9u8);
+        to_swap.add_cargo_under_path(&vec![], 90).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 91).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 92).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 93).unwrap();
+
+        let result = n.swap_node_by_path(&vec![1], to_swap);
+        assert!(result.is_ok());
+        let removed = result.unwrap();
+
+        assert_eq!(4, n.borrow_node_by_path(&vec![1]).unwrap().children.len());
+        assert_eq!(3, removed.children.len());
+
+        assert_eq!(&9, n.borrow_cargo_by_path(&vec![1]).unwrap());
+        assert_eq!(&93, n.borrow_cargo_by_path(&vec![1, 3]).unwrap());
+        assert_eq!(&2, removed.borrow_cargo_by_path(&vec![]).unwrap());
+        assert_eq!(&22, removed.borrow_cargo_by_path(&vec![2]).unwrap());
     }
 }
