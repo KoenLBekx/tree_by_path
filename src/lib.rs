@@ -1,9 +1,3 @@
-// TODO : implement trait Iterator
-// - and backwards iterator
-// - if impossible, implement
-//  - traverse
-//  - traverse_retro
-
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct Node<C> {
@@ -22,7 +16,7 @@ impl<C> Node<C> {
         vec![]
     }
 
-    pub fn get_last_path(&self) -> Result<Vec<usize>, PathError> {
+    pub fn get_last_path(&self) -> Vec<usize> {
         let mut nd = self;
         let mut result_path = Vec::<usize>::new();
         let mut child_count: usize;
@@ -39,11 +33,7 @@ impl<C> Node<C> {
             }
         }
 
-        if result_path.len() == 0 {
-            return Err(PathError::RequestedPathNotAvailable);
-        }
-
-        Ok(result_path)
+        result_path
     }
 
     pub fn get_next_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
@@ -322,6 +312,10 @@ impl<C> Node<C> {
         self.borrow_node_by_path(path).is_ok()
     }
 
+    pub fn iter(&self) -> NodeIterator<C> {
+        NodeIterator::new(self)
+    }
+
     fn borrow_node_by_path(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
         let mut outcome = Ok(self);
         let mut pathix = 0usize;
@@ -375,6 +369,167 @@ pub enum PathError {
     RequestedPathNotAvailable,
     ProcessError,
 }
+
+trait NodeNavigator<C> {
+    fn get_is_fresh(&mut self) -> &mut bool;
+    fn get_back_is_fresh(&mut self) -> &mut bool;
+    fn get_current_path(&mut self) -> &mut Vec<usize>;
+    fn get_back_current_path(&mut self) -> &mut Vec<usize>;
+    fn get_next_path(&self) -> Result<Vec<usize>, PathError>;
+    fn get_previous_path(&self) -> Result<Vec<usize>, PathError>;
+
+    fn get_freshness(&mut self, is_forward: bool) -> &mut bool {
+        if is_forward {self.get_is_fresh()} else {self.get_back_is_fresh()}
+    }
+
+    fn set_unfresh(&mut self, is_forward: bool) {
+        let fresh_prop = self.get_freshness(is_forward);
+        *fresh_prop = false;
+    }
+
+    fn set_next_path(&mut self, is_forward:bool) -> bool {
+        let mut has_next = true;
+
+        if *self.get_freshness(is_forward) {
+            self.set_unfresh(is_forward);
+        } else { 
+            let next_path_result: Result<Vec<usize>, PathError>;
+
+            if is_forward {
+                next_path_result = self.get_next_path();
+            } else {
+                next_path_result = self.get_previous_path();
+            }
+
+            match next_path_result {
+                Ok(next_path) => {
+                    let no_next_back_crossing = if is_forward {
+                        next_path < *self.get_back_current_path()
+                    } else {
+                        next_path > *self.get_current_path()
+                    };
+
+                    if (*self.get_freshness(!is_forward)) || no_next_back_crossing {
+                        let path_prop: &mut Vec<usize>;
+
+                        if is_forward {
+                            path_prop = self.get_current_path();
+                        } else {
+                            path_prop = self.get_back_current_path();
+                        }
+
+                        *path_prop = next_path;
+                    } else {
+                        has_next = false;
+                    }
+                },
+                _ => has_next = false,
+            }
+        }
+
+        has_next
+    }
+}
+
+pub struct NodeIterator<'it, C> {
+    root: &'it Node<C>,
+    current_path: Vec<usize>,
+    is_fresh: bool,
+    back_current_path: Vec<usize>,
+    back_is_fresh: bool,
+}
+impl<'it, C> NodeIterator<'it, C> {
+    pub fn new(root: &'it Node<C>) -> NodeIterator<'it, C> {
+        NodeIterator {
+            root: root,
+            current_path: Vec::<usize>::new(),
+            is_fresh: true,
+            back_current_path: root.get_last_path(),
+            back_is_fresh: true,
+        }
+    }
+}
+impl<C> NodeNavigator<C> for NodeIterator<'_, C> {
+    fn get_is_fresh(&mut self) -> &mut bool { &mut self.is_fresh }
+    fn get_back_is_fresh(&mut self) -> &mut bool { &mut self.back_is_fresh }
+    fn get_current_path(&mut self) -> &mut Vec<usize> { &mut self.current_path }
+    fn get_back_current_path(&mut self) -> &mut Vec<usize> { &mut self.back_current_path }
+    fn get_next_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_next_path(&self.current_path) }
+    fn get_previous_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_previous_path(&self.back_current_path) }
+}
+impl<'it, C> Iterator for NodeIterator<'it, C> {
+    type Item = &'it C;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let has_next = self.set_next_path(true);
+
+        match has_next {
+            true => Some(self.root.borrow_cargo_by_path(&self.current_path).unwrap()),
+            false => None,
+        }
+    }
+}
+impl<'it, C> DoubleEndedIterator for NodeIterator<'it, C> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let has_next = self.set_next_path(false);
+
+        match has_next {
+            true => Some(self.root.borrow_cargo_by_path(&self.back_current_path).unwrap()),
+            false => None,
+        }
+    }
+}
+// ------------------------------------------------------------ NodeIteratorMut
+/*
+pub struct NodeIteratorMut<'it, C> {
+    root: &'it mut Node<C>,
+    current_path: Vec<usize>,
+    is_fresh: bool,
+    back_current_path: Vec<usize>,
+    back_is_fresh: bool,
+}
+impl<'it, C> NodeIteratorMut<'it, C> {
+    pub fn new(root: &'it mut Node<C>) -> NodeIterator<'it, C> {
+        NodeIterator {
+            root: root,
+            current_path: Vec::<usize>::new(),
+            is_fresh: true,
+            back_current_path: root.get_last_path(),
+            back_is_fresh: true,
+        }
+    }
+}
+impl<'it, C> NodeNavigator<C> for NodeIteratorMut<'it, C> {
+    fn get_is_fresh(&mut self) -> &mut bool { &mut self.is_fresh }
+    fn get_back_is_fresh(&mut self) -> &mut bool { &mut self.back_is_fresh }
+    fn get_current_path(&mut self) -> &mut Vec<usize> { &mut self.current_path }
+    fn get_back_current_path(&mut self) -> &mut Vec<usize> { &mut self.back_current_path }
+    fn get_next_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_next_path(&self.current_path) }
+    fn get_previous_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_previous_path(&self.back_current_path) }
+}
+impl<'it, C> Iterator for NodeIteratorMut<'it, C> {
+    type Item = &'it mut C;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let has_next = self.set_next_path(true);
+
+        match has_next {
+            true => Some(self.root.borrow_mut_cargo_by_path(&self.current_path).unwrap()),
+            false => None,
+        }
+    }
+}
+impl<'it, C> DoubleEndedIterator for NodeIteratorMut<'it, C> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let has_next = self.set_next_path(false);
+
+        match has_next {
+            true => Some(self.root.borrow_mut_cargo_by_path(&self.back_current_path).unwrap()),
+            false => None,
+        }
+    }
+}
+*/
 
 #[cfg(test)]
 mod tests {
@@ -860,8 +1015,7 @@ mod tests {
     fn node_get_last_path_on_lone_root() {
         let n = Node::new('K');
         let result = n.get_last_path();
-        assert!(result.is_err());
-        assert_eq!(Err(PathError::RequestedPathNotAvailable), result);
+        assert_eq!(Vec::<usize>::new(), result);
     }
 
     #[test]
@@ -869,8 +1023,7 @@ mod tests {
         let mut n = Node::new('K');
         n.add_cargo_under_path(&vec![], 'Z').unwrap();
         let result = n.get_last_path();
-        assert!(result.is_ok());
-        assert_eq!(Ok(vec![0usize]), result);
+        assert_eq!(vec![0usize], result);
     }
 
     #[test]
@@ -880,8 +1033,7 @@ mod tests {
         n.add_cargo_under_path(&vec![], 'C').unwrap();
         n.add_cargo_under_path(&vec![], 'D').unwrap();
         let result = n.get_last_path();
-        assert!(result.is_ok());
-        assert_eq!(Ok(vec![2usize]), result);
+        assert_eq!(vec![2usize], result);
         assert_eq!(&'D', n.borrow_cargo_by_path(&vec![2]).unwrap());
     }
 
@@ -1106,5 +1258,184 @@ mod tests {
         assert_eq!(&93, n.borrow_cargo_by_path(&vec![1, 3]).unwrap());
         assert_eq!(&2, removed.borrow_cargo_by_path(&vec![]).unwrap());
         assert_eq!(&22, removed.borrow_cargo_by_path(&vec![2]).unwrap());
+    }
+
+    #[test]
+    fn node_iter_lone_root() {
+        let n = Node::new('A');
+
+        let concat = n.iter().fold(
+            String::new(),
+            |mut accu: String, cargo: &char| {
+                accu.push(*cargo);
+                accu
+            }
+        );
+
+        assert_eq!("A".to_string(), concat);
+    }
+
+    #[test]
+    fn node_iter_back_lone_root() {
+        let n = Node::new('A');
+
+        let concat = n.iter().rfold(
+            String::new(),
+            |mut accu: String, cargo: &char| {
+                accu.push(*cargo);
+                accu
+            }
+        );
+
+        assert_eq!("A".to_string(), concat);
+    }
+
+    #[test]
+    fn node_iter() {
+        let mut n = Node::new('A');
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
+
+        let concat = n.iter().fold(
+            String::new(),
+            |mut accu: String, cargo: &char| {
+                accu.push(*cargo);
+                accu
+            }
+        );
+
+        assert_eq!("ABCDEFGH".to_string(), concat);
+    }
+
+    #[test]
+    fn node_iter_back() {
+        let mut n = Node::new('A');
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
+
+        let concat = n.iter().rfold(
+            String::new(),
+            |mut accu: String, cargo: &char| {
+                accu.push(*cargo);
+                accu
+            }
+        );
+
+        assert_eq!("HGFEDCBA".to_string(), concat);
+    }
+
+    #[test]
+    fn node_iter_next_back_dont_cross() {
+        let mut n = Node::new('A');
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
+
+        let mut concat = String::new();
+        let mut iter = n.iter();
+        let mut no_next = false;
+        let mut no_back = false;
+
+        loop {
+            if !no_next {
+                match iter.next() {
+                    Some(ch) => concat.push(*ch),
+                    None => no_next = true,
+                }
+            }
+
+            if !no_back {
+                match iter.next_back() {
+                    Some(ch) => concat.push(*ch),
+                    None => no_back = true,
+                }
+            }
+
+            if no_next && no_back {
+                break;
+            }
+        }
+
+        assert_eq!("AHBGCFDE", concat);
+    }
+
+    #[test]
+    fn node_iter_back_next_dont_cross() {
+        let mut n = Node::new('A');
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
+
+        let mut concat = String::new();
+        let mut iter = n.iter();
+        let mut no_next = false;
+        let mut no_back = false;
+
+        loop {
+            if !no_back {
+                match iter.next_back() {
+                    Some(ch) => concat.push(*ch),
+                    None => no_back = true,
+                }
+            }
+
+            if !no_next {
+                match iter.next() {
+                    Some(ch) => concat.push(*ch),
+                    None => no_next = true,
+                }
+            }
+
+            if no_next && no_back {
+                break;
+            }
+        }
+
+        assert_eq!("HAGBFCED", concat);
+    }
+
+    // Testing some assumptions about vector comparisons.
+    mod vec_partialeq {
+        #[test]
+        fn vec_same_len() {
+            let v1:Vec<usize> = vec![1, 2, 3, 1];
+            let v2:Vec<usize> = vec![1, 2, 4, 0];
+
+            assert!(v1 < v2);
+        }
+
+        #[test]
+        fn vec_unequal_size() {
+            let v1:Vec<usize> = vec![8, 9];
+            let v2:Vec<usize> = vec![8, 8, 10];
+
+            assert!(v1 > v2);
+        }
+
+        #[test]
+        fn vec_unequal_size_same_elements() {
+            let v1:Vec<usize> = vec![8, 9];
+            let v2:Vec<usize> = vec![8, 9, 0];
+
+            assert!(v1 < v2);
+        }
     }
 }
