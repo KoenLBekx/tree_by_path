@@ -1414,6 +1414,27 @@ mod tests {
         assert_eq!(23, outcome);
     }
 
+    #[test]
+    fn node_traverse_break() {
+        let mut n = Node::new(0);
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 5).unwrap();
+
+        let outcome = n.traverse(
+            0,
+            |acc, crg, _path| {
+                *acc += *crg;
+
+                *acc <= 5
+            }
+        );
+
+        assert_eq!(6, outcome);
+    }
+
     // Testing some assumptions about vector comparisons.
     mod vec_partialeq {
         #[test]
