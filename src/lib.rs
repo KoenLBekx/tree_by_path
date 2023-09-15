@@ -370,67 +370,6 @@ pub enum PathError {
     ProcessError,
 }
 
-trait NodeNavigator<C> {
-    fn get_is_fresh(&mut self) -> &mut bool;
-    fn get_back_is_fresh(&mut self) -> &mut bool;
-    fn get_current_path(&mut self) -> &mut Vec<usize>;
-    fn get_back_current_path(&mut self) -> &mut Vec<usize>;
-    fn get_next_path(&self) -> Result<Vec<usize>, PathError>;
-    fn get_previous_path(&self) -> Result<Vec<usize>, PathError>;
-
-    fn get_freshness(&mut self, is_forward: bool) -> &mut bool {
-        if is_forward {self.get_is_fresh()} else {self.get_back_is_fresh()}
-    }
-
-    fn set_unfresh(&mut self, is_forward: bool) {
-        let fresh_prop = self.get_freshness(is_forward);
-        *fresh_prop = false;
-    }
-
-    fn set_next_path(&mut self, is_forward:bool) -> bool {
-        let mut has_next = true;
-
-        if *self.get_freshness(is_forward) {
-            self.set_unfresh(is_forward);
-        } else { 
-            let next_path_result: Result<Vec<usize>, PathError>;
-
-            if is_forward {
-                next_path_result = self.get_next_path();
-            } else {
-                next_path_result = self.get_previous_path();
-            }
-
-            match next_path_result {
-                Ok(next_path) => {
-                    let no_next_back_crossing = if is_forward {
-                        next_path < *self.get_back_current_path()
-                    } else {
-                        next_path > *self.get_current_path()
-                    };
-
-                    if (*self.get_freshness(!is_forward)) || no_next_back_crossing {
-                        let path_prop: &mut Vec<usize>;
-
-                        if is_forward {
-                            path_prop = self.get_current_path();
-                        } else {
-                            path_prop = self.get_back_current_path();
-                        }
-
-                        *path_prop = next_path;
-                    } else {
-                        has_next = false;
-                    }
-                },
-                _ => has_next = false,
-            }
-        }
-
-        has_next
-    }
-}
-
 pub struct NodeIterator<'it, C> {
     root: &'it Node<C>,
     current_path: Vec<usize>,
@@ -448,14 +387,57 @@ impl<'it, C> NodeIterator<'it, C> {
             back_is_fresh: true,
         }
     }
-}
-impl<C> NodeNavigator<C> for NodeIterator<'_, C> {
-    fn get_is_fresh(&mut self) -> &mut bool { &mut self.is_fresh }
-    fn get_back_is_fresh(&mut self) -> &mut bool { &mut self.back_is_fresh }
-    fn get_current_path(&mut self) -> &mut Vec<usize> { &mut self.current_path }
-    fn get_back_current_path(&mut self) -> &mut Vec<usize> { &mut self.back_current_path }
-    fn get_next_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_next_path(&self.current_path) }
-    fn get_previous_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_previous_path(&self.back_current_path) }
+
+    fn get_freshness(&mut self, is_forward: bool) -> bool {
+        if is_forward {self.is_fresh} else {self.back_is_fresh}
+    }
+
+    fn set_unfresh(&mut self, is_forward: bool) {
+        if is_forward {
+            self.is_fresh = false;
+        } else {
+            self.back_is_fresh = false;
+        }
+    }
+
+    fn set_next_path(&mut self, is_forward:bool) -> bool {
+        let mut has_next = true;
+
+        if self.get_freshness(is_forward) {
+            self.set_unfresh(is_forward);
+        } else { 
+            let next_path_result: Result<Vec<usize>, PathError>;
+
+            if is_forward {
+                next_path_result = self.root.get_next_path(&self.current_path);
+            } else {
+                next_path_result = self.root.get_previous_path(&self.back_current_path);
+            }
+
+            match next_path_result {
+                Ok(next_path) => {
+                    let no_next_back_crossing = if is_forward {
+                        next_path < self.back_current_path
+                    } else {
+                        next_path > self.current_path
+                    };
+
+                    if (self.get_freshness(!is_forward)) || no_next_back_crossing {
+                        if is_forward {
+                            self.current_path = next_path;
+                        } else {
+                            self.back_current_path = next_path;
+                        }
+                    } else {
+                        has_next = false;
+                    }
+                },
+                _ => has_next = false,
+            }
+        }
+
+        has_next
+    }
 }
 impl<'it, C> Iterator for NodeIterator<'it, C> {
     type Item = &'it C;
@@ -479,57 +461,6 @@ impl<'it, C> DoubleEndedIterator for NodeIterator<'it, C> {
         }
     }
 }
-// ------------------------------------------------------------ NodeIteratorMut
-/*
-pub struct NodeIteratorMut<'it, C> {
-    root: &'it mut Node<C>,
-    current_path: Vec<usize>,
-    is_fresh: bool,
-    back_current_path: Vec<usize>,
-    back_is_fresh: bool,
-}
-impl<'it, C> NodeIteratorMut<'it, C> {
-    pub fn new(root: &'it mut Node<C>) -> NodeIterator<'it, C> {
-        NodeIterator {
-            root: root,
-            current_path: Vec::<usize>::new(),
-            is_fresh: true,
-            back_current_path: root.get_last_path(),
-            back_is_fresh: true,
-        }
-    }
-}
-impl<'it, C> NodeNavigator<C> for NodeIteratorMut<'it, C> {
-    fn get_is_fresh(&mut self) -> &mut bool { &mut self.is_fresh }
-    fn get_back_is_fresh(&mut self) -> &mut bool { &mut self.back_is_fresh }
-    fn get_current_path(&mut self) -> &mut Vec<usize> { &mut self.current_path }
-    fn get_back_current_path(&mut self) -> &mut Vec<usize> { &mut self.back_current_path }
-    fn get_next_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_next_path(&self.current_path) }
-    fn get_previous_path(&self) -> Result<Vec<usize>, PathError> { self.root.get_previous_path(&self.back_current_path) }
-}
-impl<'it, C> Iterator for NodeIteratorMut<'it, C> {
-    type Item = &'it mut C;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let has_next = self.set_next_path(true);
-
-        match has_next {
-            true => Some(self.root.borrow_mut_cargo_by_path(&self.current_path).unwrap()),
-            false => None,
-        }
-    }
-}
-impl<'it, C> DoubleEndedIterator for NodeIteratorMut<'it, C> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let has_next = self.set_next_path(false);
-
-        match has_next {
-            true => Some(self.root.borrow_mut_cargo_by_path(&self.back_current_path).unwrap()),
-            false => None,
-        }
-    }
-}
-*/
 
 #[cfg(test)]
 mod tests {
