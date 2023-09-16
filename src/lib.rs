@@ -670,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_under_path() {
+    fn node_add_cargo_under() {
         let mut n = Node::new(0u8);
         let mut result: Result<Vec<usize>, (PathError, u8)>;
 
@@ -705,7 +705,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_after_path_empty() {
+    fn node_add_cargo_after_empty() {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, i8)>;
 
@@ -715,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_after_path() {
+    fn node_add_cargo_after() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, i8)>;
         let mut result_path: Vec<usize>;
@@ -741,7 +741,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_before_path_empty() {
+    fn node_add_cargo_before_empty() {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, i8)>;
 
@@ -751,7 +751,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_before_path() {
+    fn node_add_cargo_before() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, i8)>;
         let mut result_path: Vec<usize>;
@@ -788,19 +788,19 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_on_lone_root() {
+    fn node_get_next_on_lone_root() {
         let n = Node::new(0u8);
         assert_eq!(Err(PathError::RequestedPathNotAvailable), n.get_next_path(&vec![]));
     }
 
     #[test]
-    fn node_get_next_path_input_not_found() {
+    fn node_get_next_input_not_found() {
         let n = Node::new(0u8);
         assert_eq!(Err(PathError::InputPathNotFound), n.get_next_path(&vec![5]));
     }
 
     #[test]
-    fn node_get_next_path_from_last() {
+    fn node_get_next_from_last() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn node_get_next_path_from_last_unwrap() {
+    fn node_get_next_from_last_unwrap() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -818,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_next_sibling() {
+    fn node_get_next_next_sibling() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -831,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_root_to_child() {
+    fn node_get_next_root_to_child() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -839,7 +839,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_non_root_to_child() {
+    fn node_get_next_non_root_to_child() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -849,7 +849,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_non_child_to_parents_sibling() {
+    fn node_get_next_non_child_to_parents_sibling() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -859,7 +859,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_non_child_to_grandparents_sibling() {
+    fn node_get_next_non_child_to_grandparents_sibling() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -870,7 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_next_path_from_last_is_grandchild() {
+    fn node_get_next_from_last_is_grandchild() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -880,7 +880,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_previous_path_from_unexistent() {
+    fn node_get_previous_from_unexistent() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -890,13 +890,13 @@ mod tests {
     }
 
     #[test]
-    fn node_get_previous_path_from_root() {
+    fn node_get_previous_from_root() {
         let n = Node::new(String::from("aaa"));
         assert_eq!(Err(PathError::RequestedPathNotAvailable), n.get_previous_path(&vec![]));
     }
 
     #[test]
-    fn node_get_previous_path() {
+    fn node_get_previous() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 1).unwrap();
         n.add_cargo_after(&vec![0], 2).unwrap();
@@ -965,14 +965,14 @@ mod tests {
     }
 
     #[test]
-    fn node_get_last_path_on_lone_root() {
+    fn node_get_last_on_lone_root() {
         let n = Node::new('K');
         let result = n.get_last_path();
         assert_eq!(Vec::<usize>::new(), result);
     }
 
     #[test]
-    fn node_get_last_path_on_lone_child() {
+    fn node_get_last_on_lone_child() {
         let mut n = Node::new('K');
         n.add_cargo_under(&vec![], 'Z').unwrap();
         let result = n.get_last_path();
@@ -980,7 +980,7 @@ mod tests {
     }
 
     #[test]
-    fn node_get_last_path_on_first_level() {
+    fn node_get_last_on_first_level() {
         let mut n = Node::new('A');
         n.add_cargo_under(&vec![], 'B').unwrap();
         n.add_cargo_under(&vec![], 'C').unwrap();
@@ -991,7 +991,7 @@ mod tests {
     }
 
     #[test]
-    fn node_extract_node_by_path_root() {
+    fn node_extract_node_by_root() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&n.get_first_path());
@@ -1000,7 +1000,7 @@ mod tests {
     }
 
     #[test]
-    fn node_extract_node_by_path_nonexistent() {
+    fn node_extract_node_by_nonexistent() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&vec![0, 3]);
@@ -1009,7 +1009,7 @@ mod tests {
     }
 
     #[test]
-    fn node_extract_node_by_path_lone_leaf() {
+    fn node_extract_node_by_lone_leaf() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&vec![0]);
@@ -1019,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    fn node_extract_node_by_path_lone_non_leaf() {
+    fn node_extract_node_by_lone_non_leaf() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&n.get_first_path(), 1).unwrap();
         n.add_cargo_under(&vec![0], 2).unwrap();
@@ -1032,7 +1032,7 @@ mod tests {
     }
 
     #[test]
-    fn node_extract_node_by_path_non_leaf() {
+    fn node_extract_node_by_non_leaf() {
         let mut n = Node::new(0u8);
         n.add_cargo_under(&vec![], 90).unwrap();
         n.add_cargo_under(&vec![], 1).unwrap();
@@ -1049,7 +1049,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_under_nonexistent_path() {
+    fn node_add_node_under_nonexistent() {
         let mut n = Node::new(0u8);
         let n1 = Node::new(1u8);
         let result: Result<Vec<usize>, (PathError, Node<u8>)>;
@@ -1062,7 +1062,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_under_path() {
+    fn node_add_node_under() {
         let mut n = Node::new(0u8);
         let n1 = Node::new(1u8);
         let result: Result<Vec<usize>, (PathError, Node<u8>)>;
@@ -1076,7 +1076,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_after_path_empty() {
+    fn node_add_node_after_empty() {
         let mut n = Node::new(0i8);
         let n1 = Node::new(-38i8);
         let result: Result<Vec<usize>, (PathError, Node<i8>)>;
@@ -1087,7 +1087,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_after_path() {
+    fn node_add_node_after() {
         let mut n = Node::new(0i8);
         let n1 = Node::new(1i8);
         let mut result: Result<Vec<usize>, (PathError, Node<i8>)>;
@@ -1116,7 +1116,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_before_path_empty() {
+    fn node_add_node_before_empty() {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, Node<i8>)>;
 
@@ -1126,7 +1126,7 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_before_path() {
+    fn node_add_node_before() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, Node<i8>)>;
         let mut result_path: Vec<usize>;
@@ -1163,7 +1163,7 @@ mod tests {
     }
     
     #[test]
-    fn node_swap_node_by_path_root() {
+    fn node_swap_node_by_root() {
         let mut n = Node::new(0u8);
         let to_swap = Node::new(1u8);
         let result = n.swap_node(&vec![], to_swap);
@@ -1174,7 +1174,7 @@ mod tests {
     }
 
     #[test]
-    fn node_swap_node_by_path_unexistent() {
+    fn node_swap_node_by_nonexistent() {
         let mut n = Node::new(0u8);
         let to_swap = Node::new(1u8);
         let result = n.swap_node(&vec![8], to_swap);
