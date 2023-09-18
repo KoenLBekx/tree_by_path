@@ -339,47 +339,45 @@ impl<C> Node<C> {
     }
 
     fn borrow_node(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
-        let mut outcome = Ok(self);
         let mut pathix = 0usize;
+        let mut current_ix: usize;
         let path_len = path.len();
-        let mut nd: &Node<C>;
+        let mut nd: &Node<C> = self;
 
         while pathix < path_len {
-            nd = outcome.unwrap();
+            current_ix = path[pathix];
 
-            if path[pathix] < nd.children.len() {
-                outcome = Ok(&nd.children[path[pathix]]);
+            if current_ix < nd.children.len() {
+                nd = &nd.children[current_ix];
             } else {
-                outcome = Err(PathError::InputPathNotFound);
-                break;
+                return Err(PathError::InputPathNotFound);
             }
 
             pathix += 1;
         }
 
-        outcome
+        Ok(nd)
     }
 
     fn borrow_mut_node(&mut self, path: &Vec<usize>) -> Result<&mut Node<C>, PathError> {
-        let mut outcome = Ok(self);
         let mut pathix = 0usize;
+        let mut current_ix: usize;
         let path_len = path.len();
-        let mut nd: &mut Node<C>;
+        let mut nd: &mut Node<C> = self;
 
         while pathix < path_len {
-            nd = outcome.unwrap();
+            current_ix = path[pathix];
 
-            if path[pathix] < nd.children.len() {
-                outcome = Ok(&mut nd.children[path[pathix]]);
+            if current_ix < nd.children.len() {
+                nd = &mut nd.children[current_ix];
             } else {
-                outcome = Err(PathError::InputPathNotFound);
-                break;
+                return Err(PathError::InputPathNotFound);
             }
 
             pathix += 1;
         }
 
-        outcome
+        Ok(nd)
     }
 }
 
@@ -1433,6 +1431,51 @@ mod tests {
         );
 
         assert_eq!(6, outcome);
+    }
+
+    #[test]
+    #[ignore]
+    fn node_many() {
+        let mut n = Node::new(0usize);
+        let total_siblings = 10usize;
+        let total_nodes = total_siblings * 5000usize;
+        let mut siblings_count = 1usize;
+        let mut path = Vec::<usize>::new();
+
+        for crg in 0usize..total_nodes {
+            if siblings_count < total_siblings {
+                n.add_cargo_under(&path, crg).unwrap();
+                siblings_count += 1;
+            } else {
+                path = n.add_cargo_under(&path, crg).unwrap();
+                siblings_count = 1;
+            }
+        }
+
+        /*
+        let outcome = n.iter().fold(0usize, |mut acc, _crg| {
+            acc += 1;
+            acc
+        });
+        */
+        
+        // traverse is faster than iter().fold.
+        let outcome = n.traverse(
+            0usize,
+            |acc, _crg, _path| {
+                *acc += 1;
+                true
+            }
+        );
+
+        assert_eq!(total_nodes + 1, outcome);
+        assert_eq!(total_nodes / total_siblings, path.len());
+
+        // Outcome :
+        // - test lasts ca. 35.7 seconds using n.iter().fold();
+        // - test lasts ca. 33.2 seconds using n.traverse();
+        // - test lasts ca.  8.3 seconds without any of these, so just for building the tree
+        // holding 50,001 nodes.
     }
 
     // Testing some assumptions about vector comparisons.
