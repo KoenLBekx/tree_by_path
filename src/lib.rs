@@ -1,3 +1,118 @@
+//! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
+//! who in turn may or may not have other `Node<C>` children etc.
+//!
+//! Every node carries a useful cargo of generic type C ("cargo"). (Nullability of the cargo can be
+//! obtained by instantiating `Node<Option<Whatever>>` nodes.)
+//!
+//! Child nodes are directly owned by parent nodes as elements of their children vector :
+//! `Vec<Node<C>>`.
+//!
+//! ```
+//! pub struct Node<C> {
+//!     cargo: C,
+//!     children: Vec<Node<C>>,
+//! }
+//! ```
+//!
+//! This design is chosen so as to avoid the use of RefCell or other inner mutability components, which defer borrow checking
+//! from compilation to runtime.
+//!
+//! Except for the root node, all nodes in the tree are an n-th element in their parent node's
+//! children collection.
+//!
+//! This means that every node can be addressed using a `Vec<usize>` series of indexes :
+//! - the root node's address is an empty series of indexes : `[]`;
+//! - any direct child node under the root node has one index in its address, starting with `[0]`;
+//! - other nodes have a longer address, e.g.:
+//!
+//!<pre>
+//!   []
+//!   |
+//!   [0]---------------[1]--[2]
+//!    |                 |
+//!   [0,0]--[0,1]      [1,0]--[1,1]
+//!            |                 |
+//!          [0,1,0]           [1,1,0]--[1,1,1]--[1,1,2]
+//!</pre>
+//!
+//! These addresses are the paths meant in the crate's name.
+//!
+//! Use of these addresses, which are `Vec<usize>` objects accepted and returned by nearly all
+//! methods of `struct Node<C>`, allow code using this crate to hold one mutable reference to a
+//! root node, without needing any other references, thus avoiding the need of holding on to
+//! multiple mutable references of nodes of the same tree, which would be prohibited by Rust's
+//! borrow checker.
+//!
+//! Child nodes hold no reference to their parent. This parent, however, can always be retrieved by
+//! removing the last element of the indexes array the node has been addressed with.
+//!
+//! E.g.:
+//! ```
+//! use tree_by_path::{Node, PathError};
+//!
+//! let mut n = Node::new(0i8);
+//! let mut result: Result<Vec<usize>, (PathError, i8)>;
+//! let mut result_path: Vec<usize>;
+//! 
+//! // Adding a node with specified cargo after a node which doesn't exist yet :
+//! result = n.add_cargo_after(&vec![0], 1);
+//! assert!(result.is_err());
+//! assert_eq!((PathError::RequestedPathNotAvailable, 1), result.unwrap_err());
+//! 
+//! // Now we create a node that will have address [0] :
+//! result = n.add_cargo_under(&vec![], 1);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![0], result_path);
+//! 
+//! // So now we can add a node after the one having address [0] :
+//! result = n.add_cargo_after(&vec![0], 2);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![1], result_path);
+//! assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
+//! 
+//! result = n.add_cargo_after(&vec![0], 3);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![1], result_path);
+//! assert_eq!(&3, n.borrow_cargo(&result_path).unwrap());
+//! assert_eq!(&2, n.borrow_cargo(&vec![2]).unwrap());
+//!
+//! // Traversing the cargoes of all nodes can be done using the iter() method :
+//! let mut sum = n.iter().fold(
+//!     0i8,
+//!     |mut accum, &crg| {
+//!         accum += crg;
+//!         accum
+//!     }
+//! );
+//!
+//! assert_eq!(6i8, sum);
+//!
+//! // However, the traverse method runs somewhat faster and offers mutable access to the cargoes :
+//! n.traverse(
+//!     0i8,
+//!     |_acc, crg, _path| {
+//!         *crg *= 2i8;
+//!         true
+//!     }
+//! );
+//!
+//! assert_eq!(&4, n.borrow_cargo(&vec![2]).unwrap());
+//!
+//! sum = n.traverse(
+//!     0i8,
+//!     |acc, crg, _path| {
+//!         *acc += *crg;
+//!         true
+//!     }
+//! );
+//!
+//! assert_eq!(12i8, sum);
+//!
+//! ```
+
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct Node<C> {
