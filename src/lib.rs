@@ -453,6 +453,28 @@ impl<C> Node<C> {
         init
     }
 
+    pub fn traverse_back<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
+    where CallBack: FnMut(&mut Accum, &mut C, &Vec<usize>) -> bool {
+        let mut current_path = self.get_last_path();
+        let mut current_cargo: &mut C;
+
+        loop {
+            current_cargo = self.borrow_mut_cargo(&current_path)
+                .expect("While traversing, borrowing a node's cargo should never yield Result::Err.");
+
+            if !(call_back)(&mut init, current_cargo, &current_path) {
+                break;
+            }
+
+            current_path = match self.get_previous_path(&current_path) {
+                Ok(p) => p,
+                _ => break,
+            }
+        }
+
+        init
+    }
+
     fn borrow_node(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
         let mut pathix = 0usize;
         let mut current_ix: usize;
@@ -1517,6 +1539,40 @@ mod tests {
         assert_eq!(3, outcome);
 
         outcome = n.traverse(
+            0,
+            |acc, crg, _path| {
+                *acc += *crg;
+                true
+            }
+        );
+
+        assert_eq!(23, outcome);
+    }
+
+    #[test]
+    fn node_traverse_back_and_change() {
+        let mut n = Node::new(0);
+        n.add_cargo_under(&vec![], 1).unwrap();
+        n.add_cargo_under(&vec![], 2).unwrap();
+        n.add_cargo_under(&vec![1], 3).unwrap();
+        n.add_cargo_under(&vec![1], 4).unwrap();
+        n.add_cargo_under(&vec![], 5).unwrap();
+
+        let mut outcome = n.traverse_back(
+            0,
+            |acc, crg, path| {
+                if path.len() == 1 {
+                    *crg *= 2;
+                    *acc += 1;
+                }
+
+                true
+            }
+        );
+
+        assert_eq!(3, outcome);
+
+        outcome = n.traverse_back(
             0,
             |acc, crg, _path| {
                 *acc += *crg;
