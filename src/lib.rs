@@ -475,7 +475,7 @@ impl<C> Node<C> {
         init
     }
 
-    fn borrow_node(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
+    pub fn borrow_node(&self, path: &Vec<usize>) -> Result<&Node<C>, PathError> {
         let mut pathix = 0usize;
         let mut current_ix: usize;
         let path_len = path.len();
@@ -496,7 +496,7 @@ impl<C> Node<C> {
         Ok(nd)
     }
 
-    fn borrow_mut_node(&mut self, path: &Vec<usize>) -> Result<&mut Node<C>, PathError> {
+    pub fn borrow_mut_node(&mut self, path: &Vec<usize>) -> Result<&mut Node<C>, PathError> {
         let mut pathix = 0usize;
         let mut current_ix: usize;
         let path_len = path.len();
