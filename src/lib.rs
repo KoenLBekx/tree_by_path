@@ -112,6 +112,33 @@
 //! assert_eq!(12i8, sum);
 //!
 //! ```
+//!
+//! # Cloning
+//! `Node<C>` is clonable if type `C` is clonable :
+//! ```
+//! use tree_by_path::Node;
+//! let n = Node::new(20u8);
+//! let mut nc = n.clone();
+//! let root_path = n.get_first_path();
+//! let cloned_cargo = nc.borrow_mut_cargo(&root_path).unwrap();
+//! *cloned_cargo = 21u8;
+//! assert_eq!(&20u8, n.borrow_cargo(&root_path).unwrap());
+//! assert_eq!(&21u8, nc.borrow_cargo(&root_path).unwrap());
+//! ```
+//!
+//! Cloning a `Node<C>` instance having a non-clonable cargo, however, will cause a compilation error :
+//! ```compile_fail
+//! use tree_by_path::Node;
+//!
+//! #[derive(Debug)]
+//! struct NoClone {}
+//! 
+//! let mut n = Node::new(NoClone{});
+//! n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
+//! 
+//! // The below statement doesn't even compile :
+//! let nc = n.clone();
+//! ```
 
 #[derive(Debug)]
 #[derive(PartialEq)]
@@ -515,6 +542,15 @@ impl<C> Node<C> {
         }
 
         Ok(nd)
+    }
+}
+impl<C> Clone for Node<C>
+where C: Clone {
+    fn clone(&self) -> Self {
+        Node {
+            cargo: self.cargo.clone(),
+            children: self.children.clone(),
+        }
     }
 }
 
@@ -1648,6 +1684,91 @@ mod tests {
         // - test lasts ca.  8.3 seconds without any of these, so just for building the tree
         // holding 50,001 nodes.
     }
+
+    #[test]
+    fn node_clone_clonable_cargo() {
+        let mut n = Node::new(0u8);
+        let mut path: Vec<usize> = Vec::new();
+
+        for i in 1u8..4 {
+            path = n.add_cargo_under(&vec![], i).unwrap();
+        }
+
+        for i in 4u8..7 {
+            n.add_cargo_under(&path, i).unwrap();
+        }
+
+        let orig_total = n.traverse(
+            0u8,
+            |accum, crg, _path| {
+                *accum += *crg;
+                true
+            }
+        );
+
+        assert_eq!(21u8, orig_total);
+
+        let mut nc = n.clone();
+
+        let mut clone_total = nc.traverse(
+            0u8,
+            |accum, crg, _path| {
+                *accum += *crg;
+                true
+            }
+        );
+
+        assert_eq!(orig_total, clone_total);
+
+        // Add 1 to all cargoes of the clone.
+        let clone_node_count = nc.traverse(
+            0u8,
+            |accum, crg, _path| {
+                *accum += 1u8;
+                *crg += 1u8;
+                true
+            }
+        );
+
+        assert_eq!(7u8, clone_node_count);
+
+        clone_total = nc.traverse(
+            0u8,
+            |accum, crg, _path| {
+                *accum += *crg;
+                true
+            }
+        );
+
+        assert_eq!(orig_total + clone_node_count, clone_total);
+
+        // Check if values of original haven't changed.
+
+        let new_orig_total = n.traverse(
+            0u8,
+            |accum, crg, _path| {
+                *accum += *crg;
+                true
+            }
+        );
+
+        assert_eq!(orig_total, new_orig_total);
+    }
+
+    /*
+    #[test]
+    fn node_clone_non_clonable_cargo() {
+        #[derive(Debug)]
+        struct NoClone {}
+
+        let mut n = Node::new(NoClone{});
+        n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
+
+        // The below statement doesn't even compile, quod erat demonstrandum :
+        // error[E0599]: the method `clone` exists for struct `Node<NoClone>`, but its trait bounds were not satisfied
+        // let nc = n.clone();
+    }
+    */
 
     // Testing some assumptions about vector comparisons.
     mod vec_partialeq {
