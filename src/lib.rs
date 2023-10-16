@@ -9,8 +9,8 @@
 //!
 //! ```
 //! pub struct Node<C> {
-//!     cargo: C,
-//!     children: Vec<Node<C>>,
+//!     pub cargo: C,
+//!     pub children: Vec<Node<C>>,
 //! }
 //! ```
 //!
@@ -90,11 +90,11 @@
 //!
 //! assert_eq!(6i8, sum);
 //!
-//! // However, the traverse method runs somewhat faster and offers mutable access to the cargoes :
+//! // However, the traverse method runs somewhat faster and offers mutable access to the nodes :
 //! n.traverse(
 //!     0i8,
-//!     |_acc, crg, _path| {
-//!         *crg *= 2i8;
+//!     |_acc, nd, _path| {
+//!         nd.cargo *= 2i8;
 //!         true
 //!     }
 //! );
@@ -103,8 +103,8 @@
 //!
 //! sum = n.traverse(
 //!     0i8,
-//!     |acc, crg, _path| {
-//!         *acc += *crg;
+//!     |acc, nd, _path| {
+//!         *acc += nd.cargo;
 //!         true
 //!     }
 //! );
@@ -143,8 +143,8 @@
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub struct Node<C> {
-    cargo: C,
-    children: Vec<Node<C>>,
+    pub cargo: C,
+    pub children: Vec<Node<C>>,
 }
 impl<C> Node<C> {
     pub fn new(cargo: C) -> Node<C> {
@@ -459,15 +459,15 @@ impl<C> Node<C> {
     }
 
     pub fn traverse<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
-    where CallBack: FnMut(&mut Accum, &mut C, &Vec<usize>) -> bool {
+    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> bool {
         let mut current_path = self.get_first_path();
-        let mut current_cargo: &mut C;
+        let mut current_node: &mut Node<C>;
 
         loop {
-            current_cargo = self.borrow_mut_cargo(&current_path)
-                .expect("While traversing, borrowing a node's cargo should never yield Result::Err.");
+            current_node = self.borrow_mut_node(&current_path)
+                .expect("While traversing, borrowing a node should never yield Result::Err.");
 
-            if !(call_back)(&mut init, current_cargo, &current_path) {
+            if !(call_back)(&mut init, current_node, &current_path) {
                 break;
             }
 
@@ -481,15 +481,15 @@ impl<C> Node<C> {
     }
 
     pub fn traverse_back<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
-    where CallBack: FnMut(&mut Accum, &mut C, &Vec<usize>) -> bool {
+    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> bool {
         let mut current_path = self.get_last_path();
-        let mut current_cargo: &mut C;
+        let mut current_node: &mut Node<C>;
 
         loop {
-            current_cargo = self.borrow_mut_cargo(&current_path)
-                .expect("While traversing, borrowing a node's cargo should never yield Result::Err.");
+            current_node = self.borrow_mut_node(&current_path)
+                .expect("While traversing, borrowing a node should never yield Result::Err.");
 
-            if !(call_back)(&mut init, current_cargo, &current_path) {
+            if !(call_back)(&mut init, current_node, &current_path) {
                 break;
             }
 
@@ -1542,8 +1542,8 @@ mod tests {
 
         let outcome = n.traverse(
             0,
-            |acc, crg, _path| {
-                *acc += *crg;
+            |acc, nd, _path| {
+                *acc += nd.cargo;
                 true
             }
         );
@@ -1562,9 +1562,9 @@ mod tests {
 
         let mut outcome = n.traverse(
             0,
-            |acc, crg, path| {
+            |acc, nd, path| {
                 if path.len() == 1 {
-                    *crg *= 2;
+                    nd.cargo *= 2;
                     *acc += 1;
                 }
 
@@ -1576,8 +1576,8 @@ mod tests {
 
         outcome = n.traverse(
             0,
-            |acc, crg, _path| {
-                *acc += *crg;
+            |acc, nd, _path| {
+                *acc += nd.cargo;
                 true
             }
         );
@@ -1596,9 +1596,9 @@ mod tests {
 
         let mut outcome = n.traverse_back(
             0,
-            |acc, crg, path| {
+            |acc, nd, path| {
                 if path.len() == 1 {
-                    *crg *= 2;
+                    nd.cargo *= 2;
                     *acc += 1;
                 }
 
@@ -1610,8 +1610,8 @@ mod tests {
 
         outcome = n.traverse_back(
             0,
-            |acc, crg, _path| {
-                *acc += *crg;
+            |acc, nd, _path| {
+                *acc += nd.cargo;
                 true
             }
         );
@@ -1630,8 +1630,8 @@ mod tests {
 
         let outcome = n.traverse(
             0,
-            |acc, crg, _path| {
-                *acc += *crg;
+            |acc, nd, _path| {
+                *acc += nd.cargo;
 
                 *acc <= 5
             }
@@ -1700,8 +1700,8 @@ mod tests {
 
         let orig_total = n.traverse(
             0u8,
-            |accum, crg, _path| {
-                *accum += *crg;
+            |accum, nd, _path| {
+                *accum += nd.cargo;
                 true
             }
         );
@@ -1712,8 +1712,8 @@ mod tests {
 
         let mut clone_total = nc.traverse(
             0u8,
-            |accum, crg, _path| {
-                *accum += *crg;
+            |accum, nd, _path| {
+                *accum += nd.cargo;
                 true
             }
         );
@@ -1723,9 +1723,9 @@ mod tests {
         // Add 1 to all cargoes of the clone.
         let clone_node_count = nc.traverse(
             0u8,
-            |accum, crg, _path| {
+            |accum, nd, _path| {
                 *accum += 1u8;
-                *crg += 1u8;
+                nd.cargo += 1u8;
                 true
             }
         );
@@ -1734,8 +1734,8 @@ mod tests {
 
         clone_total = nc.traverse(
             0u8,
-            |accum, crg, _path| {
-                *accum += *crg;
+            |accum, nd, _path| {
+                *accum += nd.cargo;
                 true
             }
         );
@@ -1746,8 +1746,8 @@ mod tests {
 
         let new_orig_total = n.traverse(
             0u8,
-            |accum, crg, _path| {
-                *accum += *crg;
+            |accum, nd, _path| {
+                *accum += nd.cargo;
                 true
             }
         );
@@ -1769,6 +1769,28 @@ mod tests {
         // let nc = n.clone();
     }
     */
+
+    #[test]
+    fn node_traverse_change_children() {
+        let mut n = Node::new(0u8);
+        let root_path = n.get_first_path();
+
+        for i in 1u8..4 {
+            n.add_cargo_under(&root_path, i).unwrap();
+        }
+
+        n.traverse(
+            0u8,
+            |_accum, nd, _path| {
+                if nd.cargo == 2 {
+                    nd.add_cargo_under(&root_path, 4u8).unwrap();
+                }
+                true
+            }
+        );
+
+        assert_eq!(&4u8, n.borrow_cargo(&vec![1usize, 0usize]).unwrap());
+    }
 
     // Testing some assumptions about vector comparisons.
     mod vec_partialeq {
