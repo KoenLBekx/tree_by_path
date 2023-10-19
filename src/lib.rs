@@ -1,3 +1,4 @@
+//{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
 //! who in turn may or may not have other `Node<C>` children etc.
 //!
@@ -48,7 +49,7 @@
 //!
 //! E.g.:
 //! ```
-//! use tree_by_path::{Node, PathError};
+//! use tree_by_path::{Node, PathError, TraverseAction};
 //!
 //! let mut n = Node::new(0i8);
 //! let mut result: Result<Vec<usize>, (PathError, i8)>;
@@ -95,7 +96,7 @@
 //!     0i8,
 //!     |_acc, nd, _path| {
 //!         nd.cargo *= 2i8;
-//!         true
+//!         TraverseAction::Continue
 //!     }
 //! );
 //!
@@ -105,7 +106,7 @@
 //!     0i8,
 //!     |acc, nd, _path| {
 //!         *acc += nd.cargo;
-//!         true
+//!         TraverseAction::Continue
 //!     }
 //! );
 //!
@@ -139,13 +140,20 @@
 //! // The below statement doesn't even compile :
 //! let nc = n.clone();
 //! ```
+//}
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+pub enum TraverseAction {
+    Continue,
+    SkipChildren,
+    Stop,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Node<C> {
     pub cargo: C,
     pub children: Vec<Node<C>>,
 }
+
 impl<C> Node<C> {
     pub fn new(cargo: C) -> Node<C> {
         Node {
@@ -458,8 +466,21 @@ impl<C> Node<C> {
         NodeIterator::new(self)
     }
 
+    //{ Documentation
+    /// `traverse` receives two arguments :
+    /// - an initial value for an accumulator;
+    /// - a callback function or closure.
+    /// 'traverse' passes a node and all of its child nodes to this callback closure or function.
+    /// The callback closure receives three parameters :
+    /// - a mutable reference to the accumulated value;
+    /// - a mutable reference to the node passed to it;
+    /// - a reference to the passed node's address or path.
+    /// Unlike `std::iter::Iterator.fold`, the callback closure doesn't return the accumulated value,
+    /// but a TraverseAction variant.
+    /// (As the accumulated value is mutable, it can be manipulated by the callback closure.)
+    //}
     pub fn traverse<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
-    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> bool {
+    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> TraverseAction {
         let mut current_path = self.get_first_path();
         let mut current_node: &mut Node<C>;
 
@@ -467,8 +488,19 @@ impl<C> Node<C> {
             current_node = self.borrow_mut_node(&current_path)
                 .expect("While traversing, borrowing a node should never yield Result::Err.");
 
-            if !(call_back)(&mut init, current_node, &current_path) {
-                break;
+            match (call_back)(&mut init, current_node, &current_path) {
+                TraverseAction::Continue => (),
+                TraverseAction::Stop => break,
+                TraverseAction::SkipChildren => {
+                    let children_count = current_node.children.len();
+
+                    if children_count > 0 {
+                        // Go to last child by adding its index to the current path,
+                        // thus effectively causing all children of current node
+                        // to be skipped.
+                        current_path.push(children_count - 1);
+                    }
+                },
             }
 
             current_path = match self.get_next_path(&current_path) {
@@ -480,8 +512,16 @@ impl<C> Node<C> {
         init
     }
 
+    //{ Documentation
+    /// `traverse_back` acts in a similar way as the `traverse` method, except
+    /// - the nodes are visited in exactly the inverse order that `traverse` would visit them -
+    ///     this means that a node's children are visited before their parent node,
+    ///     and the root node is visited last.
+    /// - `TraverseAction::SkipChildren` causes a node's parent to be visited next, and preceding
+    ///     siblins to be skipped.
+    //}
     pub fn traverse_back<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
-    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> bool {
+    where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> TraverseAction {
         let mut current_path = self.get_last_path();
         let mut current_node: &mut Node<C>;
 
@@ -489,8 +529,30 @@ impl<C> Node<C> {
             current_node = self.borrow_mut_node(&current_path)
                 .expect("While traversing, borrowing a node should never yield Result::Err.");
 
+            /*
             if !(call_back)(&mut init, current_node, &current_path) {
                 break;
+            }
+            */
+            match (call_back)(&mut init, current_node, &current_path) {
+                TraverseAction::Continue => (),
+                TraverseAction::Stop => break,
+
+                // One can't skip all of the current node's children
+                // when traversing backward,
+                // because these children are traversed first.
+                // But one can ask to ignore other siblings and jump to the parent.
+                TraverseAction::SkipChildren =>  {
+                    let path_len = current_path.len();
+
+                    if path_len > 0 {
+                        let current_index = current_path[path_len - 1];
+
+                        if current_index > 0 {
+                            current_path[path_len - 1] = 0;
+                        }
+                    }
+                },
             }
 
             current_path = match self.get_previous_path(&current_path) {
@@ -544,6 +606,7 @@ impl<C> Node<C> {
         Ok(nd)
     }
 }
+
 impl<C> Clone for Node<C>
 where C: Clone {
     fn clone(&self) -> Self {
@@ -554,8 +617,7 @@ where C: Clone {
     }
 }
 
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum PathError {
     InputPathNotFound,
     InputPathNotFitForOperation,
@@ -1544,7 +1606,7 @@ mod tests {
             0,
             |acc, nd, _path| {
                 *acc += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1568,7 +1630,7 @@ mod tests {
                     *acc += 1;
                 }
 
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1578,7 +1640,7 @@ mod tests {
             0,
             |acc, nd, _path| {
                 *acc += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1602,7 +1664,7 @@ mod tests {
                     *acc += 1;
                 }
 
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1612,7 +1674,7 @@ mod tests {
             0,
             |acc, nd, _path| {
                 *acc += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1633,11 +1695,148 @@ mod tests {
             |acc, nd, _path| {
                 *acc += nd.cargo;
 
-                *acc <= 5
+                if *acc <= 5 { TraverseAction::Continue } else { TraverseAction::Stop }
             }
         );
 
         assert_eq!(6, outcome);
+    }
+
+    #[test]
+    fn traverse_skip_children_on_lone_root() {
+        let mut n = Node::new('A');
+
+        let count_nodes = n.traverse(
+            0usize,
+            |accum, _nd, _path| {
+                *accum += 1;
+
+                TraverseAction::SkipChildren
+            }
+        );
+
+        assert_eq!(1usize, count_nodes);
+    }
+
+    #[test]
+    fn traverse_skip_children() {
+        let mut n = Node::new(0);   
+        let root_path = n.get_first_path();
+
+        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 1);
+        n.add_cargo_under(&root_child_path, 2);
+        n.add_cargo_under(&root_child_path, 3);
+
+        root_child_path = n.add_cargo_under(&root_path, 100).unwrap();
+        n.add_cargo_under(&root_child_path, 4);
+        n.add_cargo_under(&root_child_path, 5);
+        n.add_cargo_under(&root_child_path, 6);
+
+        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 7);
+        n.add_cargo_under(&root_child_path, 8);
+        n.add_cargo_under(&root_child_path, 9);
+
+        let sum = n.traverse(
+            0,
+            |accum, nd, _path| {
+                *accum += nd.cargo;
+
+                match nd.cargo {
+                    100 => TraverseAction::SkipChildren,
+                    _ => TraverseAction::Continue,
+                }
+            }
+        );
+
+        assert_eq!(130, sum);
+    }
+
+    #[test]
+    fn traverse_back_skip_children() {
+        let mut n = Node::new(0);   
+        let root_path = n.get_first_path();
+
+        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 1);
+        n.add_cargo_under(&root_child_path, 2);
+        n.add_cargo_under(&root_child_path, 3);
+
+        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 4);
+        n.add_cargo_under(&root_child_path, 5);
+        n.add_cargo_under(&root_child_path, 6);
+
+        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 7);
+        n.add_cargo_under(&root_child_path, 8);
+        n.add_cargo_under(&root_child_path, 9);
+
+        let sum = n.traverse_back(
+            0,
+            |accum, nd, _path| {
+                if nd.cargo > 6 {
+                    TraverseAction::SkipChildren
+                } else {
+                    *accum += nd.cargo;
+                    TraverseAction::Continue
+                }
+            }
+        );
+
+        assert_eq!(21, sum);
+    }
+
+    #[test]
+    fn traverse_back_skip_children_on_first_child() {
+        let mut n = Node::new(0);   
+        let root_path = n.get_first_path();
+
+        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 1);
+        n.add_cargo_under(&root_child_path, 2);
+        n.add_cargo_under(&root_child_path, 3);
+
+        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 4);
+        n.add_cargo_under(&root_child_path, 5);
+        n.add_cargo_under(&root_child_path, 6);
+
+        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
+        n.add_cargo_under(&root_child_path, 7);
+        n.add_cargo_under(&root_child_path, 8);
+        n.add_cargo_under(&root_child_path, 9);
+
+        let sum = n.traverse_back(
+            0,
+            |accum, nd, _path| {
+                if nd.cargo == 4 {
+                    TraverseAction::SkipChildren
+                } else {
+                    *accum += nd.cargo;
+                    TraverseAction::Continue
+                }
+            }
+        );
+
+        assert_eq!(41, sum);
+    }
+
+    #[test]
+    fn traverse_back_skip_children_on_lone_root() {
+        let mut n = Node::new('A');
+
+        let count_nodes = n.traverse_back(
+            0usize,
+            |accum, _nd, _path| {
+                *accum += 1;
+
+                TraverseAction::SkipChildren
+            }
+        );
+
+        assert_eq!(1usize, count_nodes);
     }
 
     #[test]
@@ -1671,7 +1870,7 @@ mod tests {
             0usize,
             |acc, _crg, _path| {
                 *acc += 1;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1702,7 +1901,7 @@ mod tests {
             0u8,
             |accum, nd, _path| {
                 *accum += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1714,7 +1913,7 @@ mod tests {
             0u8,
             |accum, nd, _path| {
                 *accum += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1726,7 +1925,7 @@ mod tests {
             |accum, nd, _path| {
                 *accum += 1u8;
                 nd.cargo += 1u8;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1736,7 +1935,7 @@ mod tests {
             0u8,
             |accum, nd, _path| {
                 *accum += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1748,7 +1947,7 @@ mod tests {
             0u8,
             |accum, nd, _path| {
                 *accum += nd.cargo;
-                true
+                TraverseAction::Continue
             }
         );
 
@@ -1785,7 +1984,7 @@ mod tests {
                 if nd.cargo == 2 {
                     nd.add_cargo_under(&root_path, 4u8).unwrap();
                 }
-                true
+                TraverseAction::Continue
             }
         );
 
