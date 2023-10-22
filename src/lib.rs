@@ -492,13 +492,15 @@ impl<C> Node<C> {
                 TraverseAction::Continue => (),
                 TraverseAction::Stop => break,
                 TraverseAction::SkipChildren => {
-                    let children_count = current_node.children.len();
+                    let mut last_child_index: usize;
 
-                    if children_count > 0 {
-                        // Go to last child by adding its index to the current path,
-                        // thus effectively causing all children of current node
-                        // to be skipped.
-                        current_path.push(children_count - 1);
+                    // Go to last child of last child of ... of current node
+                    // thus effectively causing all children of current node
+                    // to be skipped.
+                    while current_node.children.len() > 0 {
+                        last_child_index = current_node.children.len() - 1;
+                        current_path.push(last_child_index);
+                        current_node = &mut current_node.children[last_child_index];
                     }
                 },
             }
@@ -1722,21 +1724,23 @@ mod tests {
     fn traverse_skip_children() {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
+        let deeper_path: Vec<usize>;
 
         let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1);
-        n.add_cargo_under(&root_child_path, 2);
-        n.add_cargo_under(&root_child_path, 3);
+        n.add_cargo_under(&root_child_path, 1).unwrap();
+        n.add_cargo_under(&root_child_path, 2).unwrap();
+        n.add_cargo_under(&root_child_path, 3).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 100).unwrap();
-        n.add_cargo_under(&root_child_path, 4);
-        n.add_cargo_under(&root_child_path, 5);
-        n.add_cargo_under(&root_child_path, 6);
+        n.add_cargo_under(&root_child_path, 4).unwrap();
+        n.add_cargo_under(&root_child_path, 5).unwrap();
+        deeper_path = n.add_cargo_under(&root_child_path, 6).unwrap();
+        n.add_cargo_under(&deeper_path, 50).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7);
-        n.add_cargo_under(&root_child_path, 8);
-        n.add_cargo_under(&root_child_path, 9);
+        n.add_cargo_under(&root_child_path, 7).unwrap();
+        n.add_cargo_under(&root_child_path, 8).unwrap();
+        n.add_cargo_under(&root_child_path, 9).unwrap();
 
         let sum = n.traverse(
             0,
@@ -1759,19 +1763,19 @@ mod tests {
         let root_path = n.get_first_path();
 
         let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1);
-        n.add_cargo_under(&root_child_path, 2);
-        n.add_cargo_under(&root_child_path, 3);
+        n.add_cargo_under(&root_child_path, 1).unwrap();
+        n.add_cargo_under(&root_child_path, 2).unwrap();
+        n.add_cargo_under(&root_child_path, 3).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 4);
-        n.add_cargo_under(&root_child_path, 5);
-        n.add_cargo_under(&root_child_path, 6);
+        n.add_cargo_under(&root_child_path, 4).unwrap();
+        n.add_cargo_under(&root_child_path, 5).unwrap();
+        n.add_cargo_under(&root_child_path, 6).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7);
-        n.add_cargo_under(&root_child_path, 8);
-        n.add_cargo_under(&root_child_path, 9);
+        n.add_cargo_under(&root_child_path, 7).unwrap();
+        n.add_cargo_under(&root_child_path, 8).unwrap();
+        n.add_cargo_under(&root_child_path, 9).unwrap();
 
         let sum = n.traverse_back(
             0,
@@ -1794,19 +1798,19 @@ mod tests {
         let root_path = n.get_first_path();
 
         let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1);
-        n.add_cargo_under(&root_child_path, 2);
-        n.add_cargo_under(&root_child_path, 3);
+        n.add_cargo_under(&root_child_path, 1).unwrap();
+        n.add_cargo_under(&root_child_path, 2).unwrap();
+        n.add_cargo_under(&root_child_path, 3).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 4);
-        n.add_cargo_under(&root_child_path, 5);
-        n.add_cargo_under(&root_child_path, 6);
+        n.add_cargo_under(&root_child_path, 4).unwrap();
+        n.add_cargo_under(&root_child_path, 5).unwrap();
+        n.add_cargo_under(&root_child_path, 6).unwrap();
 
         root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7);
-        n.add_cargo_under(&root_child_path, 8);
-        n.add_cargo_under(&root_child_path, 9);
+        n.add_cargo_under(&root_child_path, 7).unwrap();
+        n.add_cargo_under(&root_child_path, 8).unwrap();
+        n.add_cargo_under(&root_child_path, 9).unwrap();
 
         let sum = n.traverse_back(
             0,
