@@ -1,3 +1,6 @@
+// TODO : complete method swap_cargo.
+// TODO : complete documentation.
+// TODO : set version to 1.0.0.
 //{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
 //! who in turn may or may not have other `Node<C>` children etc.
@@ -142,12 +145,62 @@
 //! ```
 //}
 
+/// A `TraverseAction` variant is expected as the return value of the callback closure or function
+/// passed to `Node`'s `traverse` or `traverse_back` methods.
 pub enum TraverseAction {
+    /// Tells the traverse* methods to continue traversing the tree.
     Continue,
+
+    /// Tells the traverse method to skip all children of the node being handled by the callback
+    /// closure.
+    /// The traverse_back method, who visits a node's children first, will jump immediately to the
+    /// parent of the node being handled, thus skipping all preceding siblings.
     SkipChildren,
+
+    /// Tells the traverse* methods to stop the tree traversal, so no more nodes will be visited.
     Stop,
 }
 
+// { Documentation
+/// The easiest way to construct a Node is by using its associated function Node::new, immediately
+/// passing its cargo. As a tree consists of only Nodes, this first Node is a tree having one Node.
+///
+/// Afterwards, other Nodes can be added to the tree, either by passing a cargo, or else by
+/// creating another Node (with or without subnodes) and adding it as a child to the first or any
+/// other node of the tree :
+/// ```
+/// use tree_by_path::{Node, TraverseAction};
+///
+/// // Creating a first node.
+/// let mut n = Node::new('a');
+///
+/// // n is a one-node tree now. Let's add a child node by passing a cargo.
+/// let root_path = n.get_first_path();
+/// n.add_cargo_under(&root_path, 'b').expect(
+///     "It should always be possible to add a node under the root node");
+///
+/// // Let's create another small tree having cargoes of the same type.
+/// let mut n2 = Node::new('c');
+/// n2.add_cargo_under(&root_path, 'd').expect(
+///     "It should always be possible to add a node under the root node");
+///
+/// // Now we add the second tree's root node as a child to the first tree's root node :
+/// n.add_node_under(&root_path, n2).expect(
+///     "It should always be possible to add a node under the root node");
+///
+/// // Concatenating all of the tree's nodes' cargoes :
+/// let concatenated = n.traverse(
+///     String::new(),
+///     |accum, current_node, _path| {
+///         accum.push(current_node.cargo);
+///         TraverseAction::Continue
+///     }
+/// );
+///
+/// assert_eq!("abcd".to_string(), concatenated);
+/// 
+/// ```
+// }
 #[derive(Debug, PartialEq)]
 pub struct Node<C> {
     pub cargo: C,
@@ -155,6 +208,15 @@ pub struct Node<C> {
 }
 
 impl<C> Node<C> {
+    // { Documentation
+    /// Creates a new node and immediately also a new tree having a single (root) node.
+    ///
+    /// The cargo has to be passed immediately. If you need a tree with optional cargoes
+    /// in the nodes, create a node having an `Option<Whatever>` as cargo.
+    ///
+    /// Any node, with its subnodes, can  always be attached as a child to a tree having nodes of the
+    /// same cargo type.
+    // }
     pub fn new(cargo: C) -> Node<C> {
         Node {
             cargo: cargo,
@@ -162,10 +224,16 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Returns `Vec::<usize>::new()`, as this is always the root node's path.
+    // }
     pub fn get_first_path(&self) -> Vec<usize> {
         vec![]
     }
 
+    // { Documentation
+    /// Returns the path or address of the last subnode of the node on which this method is called.
+    // }
     pub fn get_last_path(&self) -> Vec<usize> {
         let mut nd = self;
         let mut result_path = Vec::<usize>::new();
@@ -186,6 +254,36 @@ impl<C> Node<C> {
         result_path
     }
 
+    // { Documentation
+    /// Returns the path or address of the next child node after the child node having the path passed as
+    /// an argument.
+    ///
+    /// This next child node can be its first child, or its next sibling if it hasn't any children,
+    /// or its parent's next sibling if it's the last child of its parent node, or even its
+    /// grandparent, etc.
+    ///
+    /// If there is no next node (when the path passed as argument is the path of the tree's last
+    /// node), a `PathError::RequestedPathNotAvailable` is returned.
+    /// 
+    /// Note that `Node.traverse` internally uses this method.
+    ///
+    /// Example :
+    ///
+    /// ```
+    /// use tree_by_path::Node;
+    ///
+    /// let mut n = Node::new("Brussels".to_string());
+    /// let root_path = Vec::<usize>::new();
+    ///
+    /// let ghent_path = n.add_cargo_under(&root_path, "Ghent".to_string()).expect(
+    ///     "Error adding node under root node");
+    ///
+    /// let antwerp_path = n.add_cargo_under(&root_path, "Antwerp".to_string()).expect(
+    ///     "Error adding node under root node");
+    ///
+    /// assert_eq!(Ok(antwerp_path.clone()), n.get_next_path(&ghent_path));
+    /// ```
+    // }
     pub fn get_next_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
         let mut result_path = path.clone();
 
@@ -223,6 +321,15 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Returns the path or address of the previous child node before the child node having the path passed as
+    /// an argument.
+    ///
+    /// If there is no previous node (when the path passed as argument is the path of the tree's
+    /// first node), a `PathError::RequestedPathNotAvailable` is returned.
+    ///
+    /// Note that `Node.traverse_back` internally uses this method.
+    // }
     pub fn get_previous_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
         if path.len() == 0 {
             return Err(PathError::RequestedPathNotAvailable);
@@ -262,6 +369,51 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds a new child node under it having the given cargo,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, cargo_not_having_been_moved_into_tree))`.
+    ///
+    /// Example :
+    /// ```
+    /// use tree_by_path::{Node, PathError};
+    ///
+    /// let mut n = Node::new(0u8);
+    /// let mut result: Result<Vec<usize>, (PathError, u8)>;
+    ///
+    /// result = n.add_cargo_under(&vec![], 1);
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0], result.unwrap());
+    ///
+    /// result = n.add_cargo_under(&vec![], 2);
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![1], result.unwrap());
+    /// assert_eq!(&2, n.borrow_cargo(&vec![1]).unwrap());
+    ///
+    /// result = n.add_cargo_under(&vec![0], 3);
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0, 0], result.unwrap());
+    ///
+    /// result = n.add_cargo_under(&vec![0], 4);
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0, 1], result.unwrap());
+    ///
+    /// let borrowed = n.borrow_cargo(&vec![0, 1]);
+    /// assert!(borrowed.is_ok());
+    /// assert_eq!(&4, borrowed.unwrap());
+    ///
+    /// result = n.add_cargo_under(&vec![50], 99);
+    /// assert!(result.is_err());
+    /// assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
+    ///
+    /// result = n.add_cargo_under(&vec![0, 1, 1], 99);
+    /// assert!(result.is_err());
+    /// assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
+    /// ```
+    // }
     pub fn add_cargo_under(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         let mut result_path = path.clone();
         let borrowed = self.borrow_mut_node(path);
@@ -278,6 +430,18 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds a new child node after it,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, cargo_not_having_been_moved_into_tree))`.
+    ///
+    /// Note that trying to add a node after the root node cannot but result in<br />
+    /// `Err((PathError::InputPathNotFitForOperation, cargo_not_having_been_moved_into_tree))`,<br />
+    /// as a tree's root node can't have siblings.
+    // }
     pub fn add_cargo_after(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, cargo));
@@ -303,6 +467,18 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds a new child node before it,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, cargo_not_having_been_moved_into_tree))`.
+    ///
+    /// Note that trying to add a node before the root node cannot but result in<br />
+    /// `Err((PathError::InputPathNotFitForOperation, cargo_not_having_been_moved_into_tree))`,<br />
+    /// as a tree's root node can't have siblings.
+    // }
     pub fn add_cargo_before(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, cargo));
@@ -328,6 +504,51 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path<br />
+    /// and returns either<br />
+    /// `   Ok(removed_node_with_all_its_children)`<br />
+    /// or<br />
+    /// `   Err(PathError)`.
+    ///
+    /// Trying and removing the root node amounts to trying and removing a node from itself, which
+    /// cannot but result in an `Err(PathError::InputPathNotFitForOperation)`:
+    ///
+    /// ```
+    /// use tree_by_path::{Node, PathError};
+    ///
+    /// let mut n = Node::new(("Jane Kirby", "CEO"));
+    /// let root_path = n.get_first_path();
+    ///
+    /// let cfo_path = n.add_cargo_under(
+    ///     &root_path,
+    ///     ("Rob Delsing", "CFO")
+    /// ).unwrap();
+    ///
+    /// let account_path = n.add_cargo_under(
+    ///     &cfo_path,
+    ///     ("Pierre Lévèque", "Head of Accounting")
+    /// ).unwrap();
+    ///
+    /// let cio_path = n.add_cargo_under(
+    ///     &root_path,
+    ///     ("Dilshat Ahmetova", "CFO")
+    /// ).unwrap();
+    ///
+    /// let mut result = n.extract_node(&root_path);
+    /// assert_eq!(Err(PathError::InputPathNotFitForOperation), result);
+    ///
+    /// result = n.extract_node(&cfo_path);
+    /// match result {
+    ///     Err(_) => panic!("Failed to extract an existing child node."),
+    ///     Ok(cfo_tree) => {
+    ///         assert_eq!("Pierre Lévèque", cfo_tree.borrow_cargo(&vec![0]).unwrap().0)
+    ///     },
+    /// }
+    ///
+    /// assert_eq!("Dilshat Ahmetova", n.borrow_cargo(&vec![0]).unwrap().0)
+    /// ```
+    // }
     pub fn extract_node(&mut self, path: &Vec<usize>) -> Result<Node<C>, PathError> {
         if path.len() == 0 {
             return Err(PathError::InputPathNotFitForOperation);
@@ -349,6 +570,51 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds the given node under it,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, node_not_having_been_moved_into_tree))`.
+    ///
+    /// Example :
+    /// ```
+    /// use tree_by_path::{Node, PathError};
+    ///
+    /// let mut n = Node::new(0u8);
+    /// let mut result: Result<Vec<usize>, (PathError, Node<u8>)>;
+    ///
+    /// result = n.add_node_under(&vec![], Node::new(1));
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0], result.unwrap());
+    ///
+    /// result = n.add_node_under(&vec![], Node::new(2));
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![1], result.unwrap());
+    /// assert_eq!(&2, n.borrow_cargo(&vec![1]).unwrap());
+    ///
+    /// result = n.add_node_under(&vec![0], Node::new(3));
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0, 0], result.unwrap());
+    ///
+    /// result = n.add_node_under(&vec![0], Node::new(4));
+    /// assert!(result.is_ok());
+    /// assert_eq!(vec![0, 1], result.unwrap());
+    ///
+    /// let borrowed = n.borrow_cargo(&vec![0, 1]);
+    /// assert!(borrowed.is_ok());
+    /// assert_eq!(&4, borrowed.unwrap());
+    ///
+    /// result = n.add_node_under(&vec![50], Node::new(99));
+    /// assert!(result.is_err());
+    /// assert_eq!((PathError::InputPathNotFound, Node::new(99)), result.unwrap_err());
+    ///
+    /// result = n.add_node_under(&vec![0, 1, 1], Node::new(99));
+    /// assert!(result.is_err());
+    /// assert_eq!((PathError::InputPathNotFound, Node::new(99)), result.unwrap_err());
+    /// ```
+    // }
     pub fn add_node_under(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         let mut result_path = path.clone();
         let borrowed = self.borrow_mut_node(path);
@@ -365,6 +631,18 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds the given node after it,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, node_not_having_been_moved_into_tree))`.
+    ///
+    /// Note that trying to add a node after the root node cannot but result in<br />
+    /// `Err((PathError::InputPathNotFitForOperation, node_not_having_been_moved_into_tree))`,<br />
+    /// as a tree's root node can't have siblings.
+    // }
     pub fn add_node_after(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, node));
@@ -390,6 +668,18 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the tree's child node having the given path,<br />
+    /// adds the given node before it,<br />
+    /// and returns a Result being either<br />
+    /// `   Ok(path_of_added_node)`<br />
+    /// or else<br />
+    /// `   Err((PathError, node_not_having_been_moved_into_tree))`.
+    ///
+    /// Note that trying to add a node before the root node cannot but result in<br />
+    /// `Err((PathError::InputPathNotFitForOperation, node_not_having_been_moved_into_tree))`,<br />
+    /// as a tree's root node can't have siblings.
+    // }
     pub fn add_node_before(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, node));
@@ -415,6 +705,20 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Looks for the node having the given path,<br />
+    /// replaces it (with all its child nodes !) by the given node (with all its child nodes),<br />
+    /// and returns either<br />
+    /// `   Ok(node_that_was_replaced)`<br />
+    /// or else<br />
+    /// `   Err((PathError, node_not_having_been_moved_into_tree)`.
+    ///
+    /// Note that trying and replacing the root node will result in a<br />
+    /// `Err((PathError::InputPathNotFitForOperation, node))`.
+    ///
+    /// But even if replacing a tree's child node is not possible, it is possible to replace its
+    /// cargo.
+    // }
     pub fn swap_node(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Node<C>, (PathError, Node<C>)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, node));
@@ -440,6 +744,32 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Returns a `Result` having either
+    /// - a non-mutable reference to the cargo of the child node having the given path<br />
+    /// or else
+    /// - a `PathError`.
+    ///
+    /// Example:
+    /// ```
+    /// use tree_by_path::Node;
+    ///
+    /// let mut n = Node::new("Athens");
+    /// let root_path = Vec::<usize>::new();
+    /// let mut added_path: Vec<usize>;
+    ///
+    /// added_path = n.add_cargo_under(&root_path, "Thessaloniki").unwrap();
+    /// added_path = n.add_cargo_under(&added_path, "Kilkis").unwrap();
+    ///
+    /// added_path = n.add_cargo_under(&root_path, "Kavala").unwrap();
+    /// added_path = n.add_cargo_under(&added_path, "Moustheni").unwrap();
+    ///
+    /// let borrow_result = n.borrow_cargo(&vec![1, 0]);
+    ///
+    /// assert!(borrow_result.is_ok());
+    /// assert_eq!(&"Moustheni", borrow_result.unwrap());
+    /// ```
+    // }
     pub fn borrow_cargo(&self, path: &Vec<usize>) -> Result<&C, PathError> {
         let borrowed = self.borrow_node(path);
 
@@ -449,6 +779,39 @@ impl<C> Node<C> {
         }
     }
 
+    // { Documentation
+    /// Returns a `Result` having either
+    /// - a mutable reference to the cargo of the child node having the given path<br />
+    /// or else
+    /// - a `PathError`.
+    ///
+    /// Note : an easier way to change a (child) node's cargo is the set_cargo method.
+    ///
+    /// Example:
+    /// ```
+    /// use tree_by_path::Node;
+    ///
+    /// let mut n = Node::new("Greece");
+    /// let root_path = Vec::<usize>::new();
+    /// let mut added_path: Vec<usize>;
+    ///
+    /// added_path = n.add_cargo_under(&root_path, "Thessaloniki").unwrap();
+    /// added_path = n.add_cargo_under(&added_path, "Kilkis").unwrap();
+    ///
+    /// added_path = n.add_cargo_under(&root_path, "Kavala").unwrap();
+    /// added_path = n.add_cargo_under(&added_path, "Moustheni").unwrap();
+    ///
+    /// let mut borrow_result = n.borrow_mut_cargo(&vec![1, 0]);
+    /// assert!(borrow_result.is_ok());
+    /// let borrowed = borrow_result.unwrap();
+    ///
+    /// *borrowed = "Kokkinochori";
+    /// 
+    /// borrow_result = n.borrow_mut_cargo(&vec![1, 0]);
+    /// assert!(borrow_result.is_ok());
+    /// assert_eq!(&"Kokkinochori", borrow_result.unwrap());
+    /// ```
+    // }
     pub fn borrow_mut_cargo(&mut self, path: &Vec<usize>) -> Result<&mut C, PathError> {
         let borrowed = self.borrow_mut_node(path);
 
@@ -457,6 +820,53 @@ impl<C> Node<C> {
             Err(err) => Err(err),
         }
     }
+
+    // { Documentation
+    /// Returns a `Result` having either
+    /// - ()<br />
+    /// or else
+    /// - a tuple `(PathError, cargo_not_having_been_moved_into_the_tree)`.
+    ///
+    /// Note that the cargo previously held by the targeted node is lost after a call to `set_cargo`.
+    /// In order to retrieve the previously held cargo, use the `swap_cargo` method which, however, is a more
+    /// expensive operation.
+    ///
+    /// Example:
+    /// ```
+    /// use tree_by_path::Node;
+    ///
+    /// let mut n = Node::new('a');
+    /// n.add_cargo_under(&vec![], 'b').unwrap();
+    /// n.add_cargo_under(&vec![], 'c').unwrap();
+    ///
+    /// let result = n.set_cargo(&vec![1], 'z');
+    ///
+    /// assert!(result.is_ok());
+    /// assert_eq!(&'z', n.borrow_cargo(&vec![1]).unwrap());
+    /// ```
+    // }
+    pub fn set_cargo(&mut self, path: &Vec<usize>, cargo: C) -> Result<(), (PathError, C)> {
+        match self.borrow_mut_cargo(path) {
+            Ok(borrowed_cargo) => {
+                *borrowed_cargo = cargo;
+                Ok(())
+            },
+            Err(err) => Err((err, cargo)),
+        }
+    }
+
+    /*
+    pub fn swap_cargo(&mut tree_root, path: &Vec<usize>, cargo: C) -> Result<C, (PathError, C)> {
+        let mut new_node = Node::new(cargo);
+
+        let mut old_node = if path.len() == 0 {
+            self
+        } else  {
+            match 
+        };
+    }
+    */
+
 
     pub fn has_path(&self, path: &Vec<usize>) -> bool {
         self.borrow_node(path).is_ok()
@@ -471,13 +881,41 @@ impl<C> Node<C> {
     /// - an initial value for an accumulator;
     /// - a callback function or closure.
     /// 'traverse' passes a node and all of its child nodes to this callback closure or function.
+    /// 
     /// The callback closure receives three parameters :
     /// - a mutable reference to the accumulated value;
     /// - a mutable reference to the node passed to it;
     /// - a reference to the passed node's address or path.
+    ///
     /// Unlike `std::iter::Iterator.fold`, the callback closure doesn't return the accumulated value,
     /// but a TraverseAction variant.
+    ///
     /// (As the accumulated value is mutable, it can be manipulated by the callback closure.)
+    ///
+    /// Example : totalizing the numerical cargo of all nodes until the total reaches a certain
+    /// value:
+    ///
+    /// ```
+    /// use tree_by_path::{Node, TraverseAction};
+    ///
+    /// let mut n = Node::new(0);
+    /// n.add_cargo_under(&vec![], 1).unwrap();
+    /// n.add_cargo_under(&vec![], 2).unwrap();
+    /// n.add_cargo_under(&vec![1], 3).unwrap();
+    /// n.add_cargo_under(&vec![1], 4).unwrap();
+    /// n.add_cargo_under(&vec![], 5).unwrap();
+    ///
+    /// let outcome = n.traverse(
+    ///     0,
+    ///     |acc, nd, _path| {
+    ///         *acc += nd.cargo;
+    ///
+    ///         if *acc <= 5 { TraverseAction::Continue } else { TraverseAction::Stop }
+    ///     }
+    /// );
+    ///
+    /// assert_eq!(6, outcome);
+    /// ```
     //}
     pub fn traverse<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
     where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> TraverseAction {
@@ -1705,7 +2143,7 @@ mod tests {
     }
 
     #[test]
-    fn traverse_skip_children_on_lone_root() {
+    fn node_traverse_skip_children_on_lone_root() {
         let mut n = Node::new('A');
 
         let count_nodes = n.traverse(
@@ -1721,7 +2159,7 @@ mod tests {
     }
 
     #[test]
-    fn traverse_skip_children() {
+    fn node_traverse_skip_children() {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
         let deeper_path: Vec<usize>;
@@ -1758,7 +2196,7 @@ mod tests {
     }
 
     #[test]
-    fn traverse_back_skip_children() {
+    fn node_traverse_back_skip_children() {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
 
@@ -1793,7 +2231,7 @@ mod tests {
     }
 
     #[test]
-    fn traverse_back_skip_children_on_first_child() {
+    fn node_traverse_back_skip_children_on_first_child() {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
 
@@ -1828,7 +2266,7 @@ mod tests {
     }
 
     #[test]
-    fn traverse_back_skip_children_on_lone_root() {
+    fn node_traverse_back_skip_children_on_lone_root() {
         let mut n = Node::new('A');
 
         let count_nodes = n.traverse_back(
@@ -1841,6 +2279,39 @@ mod tests {
         );
 
         assert_eq!(1usize, count_nodes);
+    }
+
+    #[test]
+    fn node_set_cargo_on_root() {
+        let mut n = Node::new('a');
+        n.add_cargo_under(&vec![], 'b').unwrap();
+        n.add_cargo_under(&vec![], 'c').unwrap();
+
+        let result = n.set_cargo(&vec![], 'z');
+        assert!(result.is_ok());
+        assert_eq!(&'z', n.borrow_cargo(&vec![]).unwrap());
+    }
+
+    #[test]
+    fn node_set_cargo_wrong_path() {
+        let mut n = Node::new('a');
+        n.add_cargo_under(&vec![], 'b').unwrap();
+        n.add_cargo_under(&vec![], 'c').unwrap();
+
+        let result = n.set_cargo(&vec![1, 3], 'z');
+        assert!(result.is_err());
+        assert_eq!((PathError::InputPathNotFound, 'z'), result.unwrap_err());
+    }
+
+    #[test]
+    fn node_set_cargo() {
+        let mut n = Node::new('a');
+        n.add_cargo_under(&vec![], 'b').unwrap();
+        n.add_cargo_under(&vec![], 'c').unwrap();
+
+        let result = n.set_cargo(&vec![1], 'z');
+        assert!(result.is_ok());
+        assert_eq!(&'z', n.borrow_cargo(&vec![1]).unwrap());
     }
 
     #[test]
