@@ -1,4 +1,3 @@
-// TODO : complete method swap_cargo.
 // TODO : complete documentation.
 // TODO : set version to 1.0.0.
 //{ Documentation
@@ -855,18 +854,54 @@ impl<C> Node<C> {
         }
     }
 
-    /*
-    pub fn swap_cargo(&mut tree_root, path: &Vec<usize>, cargo: C) -> Result<C, (PathError, C)> {
+    pub fn swap_cargo(mut tree_root: Node<C>, path: &Vec<usize>, cargo: C) -> Result<(Node<C>, C), (PathError, C)> {
+
+        fn transfer_children<C>(source: &mut Node<C>, target: &mut Node<C>) -> Result<(), PathError> {
+            let mut child: Node<C>;
+
+            while source.children.len() > 0 {
+                child = match source.children.pop() {
+                    Some(ch) => ch,
+                    None => return Err(
+                        PathError::ProcessError(
+                            "Node.swap_cargo failed to pop() child nodes from old node.".to_string()
+                        )
+                    ),
+                };
+
+                target.children.insert(0, child);
+            }
+
+            Ok(())
+        }
+
         let mut new_node = Node::new(cargo);
+        let is_swap_from_root = path.len() == 0;
 
-        let mut old_node = if path.len() == 0 {
-            self
-        } else  {
-            match 
-        };
+        if is_swap_from_root {
+            match transfer_children(&mut tree_root, &mut new_node) {
+                Ok(_) => (),
+                Err(err) => return Err((err, new_node.cargo)),
+            }
+
+            Ok((new_node, tree_root.cargo))
+        } else {
+            let old_node = match tree_root.borrow_mut_node(path) {
+                Ok(node) => node,
+                Err(err) => return Err((err, new_node.cargo)),
+            };
+            
+            match transfer_children(old_node, &mut new_node) {
+                Ok(_) => (),
+                Err(err) => return Err((err, new_node.cargo)),
+            }
+
+            match tree_root.swap_node(path, new_node) {
+                Ok(extracted_node) => Ok((tree_root, extracted_node.cargo)),
+                Err((err, new_nd)) => Err((err, new_nd.cargo)),
+            }
+        }
     }
-    */
-
 
     pub fn has_path(&self, path: &Vec<usize>) -> bool {
         self.borrow_node(path).is_ok()
@@ -1062,7 +1097,7 @@ pub enum PathError {
     InputPathNotFound,
     InputPathNotFitForOperation,
     RequestedPathNotAvailable,
-    ProcessError,
+    ProcessError(String),
 }
 
 pub struct NodeIterator<'it, C> {
@@ -2316,7 +2351,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn node_many() {
+    fn node_50_000_subnodes() {
         let mut n = Node::new(0usize);
         let total_siblings = 10usize;
         let total_nodes = total_siblings * 5000usize;
@@ -2332,13 +2367,6 @@ mod tests {
                 siblings_count = 1;
             }
         }
-
-        /*
-        let outcome = n.iter().fold(0usize, |mut acc, _crg| {
-            acc += 1;
-            acc
-        });
-        */
         
         // traverse is faster than iter().fold.
         let outcome = n.traverse(
@@ -2464,6 +2492,104 @@ mod tests {
         );
 
         assert_eq!(&4u8, n.borrow_cargo(&vec![1usize, 0usize]).unwrap());
+    }
+
+    #[test]
+    fn node_swap_cargo_non_root() {
+
+        #[derive(Debug)]
+        struct NoCopy {
+            value: u8,
+        }
+
+        let mut n = Node::new(NoCopy{value: 10});
+        let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
+        n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+
+        n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
+        n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+
+        let mut total = n.traverse(
+            0u8,
+            |accum, nd, _path| {
+                *accum += nd.cargo.value;
+                TraverseAction::Continue
+            }
+        );
+
+        assert_eq!(23u8, total);
+
+        let swap_result = Node::swap_cargo(n, &added_path, NoCopy{value: 30u8});
+        assert!(swap_result.is_ok());
+
+        let old_cargo: NoCopy;
+        (n, old_cargo) = swap_result.unwrap();
+        assert_eq!(1, old_cargo.value);
+
+        total = n.traverse(
+            0u8,
+            |accum, nd, _path| {
+                *accum += nd.cargo.value;
+                TraverseAction::Continue
+            }
+        );
+
+        assert_eq!(52u8, total);
+    }
+
+    #[test]
+    fn node_swap_cargo_root() {
+
+        #[derive(Debug)]
+        struct NoCopy {
+            value: u8,
+        }
+
+        let mut n = Node::new(NoCopy{value: 10});
+        let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
+        n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+
+        n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
+        n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+
+        let mut total = n.traverse(
+            0u8,
+            |accum, nd, _path| {
+                *accum += nd.cargo.value;
+                TraverseAction::Continue
+            }
+        );
+
+        assert_eq!(23u8, total);
+
+        let swap_result = Node::swap_cargo(n, &vec![], NoCopy{value: 30u8});
+        assert!(swap_result.is_ok());
+
+        let old_cargo: NoCopy;
+        (n, old_cargo) = swap_result.unwrap();
+        assert_eq!(10, old_cargo.value);
+
+        total = n.traverse(
+            0u8,
+            |accum, nd, _path| {
+                *accum += nd.cargo.value;
+                TraverseAction::Continue
+            }
+        );
+
+        assert_eq!(43u8, total);
+    }
+
+    #[test]
+    fn node_swap_cargo_wrong_path() {
+        let mut n = Node::new('g');
+        n.add_cargo_under(&vec![], 'o').unwrap();
+
+        let result = Node::swap_cargo(n, &vec![5], 'a');
+        assert!(result.is_err());
+        
+        let old_cargo = result.unwrap_err().1;
+        assert_eq!('a', old_cargo);
     }
 
     // Testing some assumptions about vector comparisons.
