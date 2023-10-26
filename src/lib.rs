@@ -1,5 +1,3 @@
-// TODO : complete documentation.
-// TODO : set version to 1.0.0.
 //{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
 //! who in turn may or may not have other `Node<C>` children etc.
@@ -10,6 +8,9 @@
 //! Child nodes are directly owned by parent nodes as elements of their children vector :
 //! `Vec<Node<C>>`.
 //!
+//! Child nodes hold no reference to their parent. This parent, however, can always be retrieved by
+//! removing the last element of the indexes array the node has been addressed with - see below.
+//!
 //! ```
 //! pub struct Node<C> {
 //!     pub cargo: C,
@@ -17,7 +18,7 @@
 //! }
 //! ```
 //!
-//! This design is chosen so as to avoid the use of RefCell or other inner mutability components, which defer borrow checking
+//! This design has been chosen so as to avoid the use of RefCell or other inner mutability mechanisms, which defer borrow checking
 //! from compilation to runtime.
 //!
 //! Except for the root node, all nodes in the tree are an n-th element in their parent node's
@@ -46,10 +47,39 @@
 //! multiple mutable references of nodes of the same tree, which would be prohibited by Rust's
 //! borrow checker.
 //!
-//! Child nodes hold no reference to their parent. This parent, however, can always be retrieved by
-//! removing the last element of the indexes array the node has been addressed with.
+//! So, instead of references to nodes, instances of `Vec<usize>` paths can be kept in variables.
 //!
-//! E.g.:
+//! And even if these path addresses can become obsolete after insertion or removal of nodes,
+//! specific nodes can be retrieved by lookups using the `traverse*` methods if needed.
+//!
+//! # Cloning
+//! `Node<C>` is clonable if type `C` is clonable :
+//! ```
+//! use tree_by_path::Node;
+//! let n = Node::new(20u8);
+//! let mut nc = n.clone();
+//! let root_path = n.get_first_path();
+//! let cloned_cargo = nc.borrow_mut_cargo(&root_path).unwrap();
+//! *cloned_cargo = 21u8;
+//! assert_eq!(&20u8, n.borrow_cargo(&root_path).unwrap());
+//! assert_eq!(&21u8, nc.borrow_cargo(&root_path).unwrap());
+//! ```
+//!
+//! Cloning a `Node<C>` instance having a non-clonable cargo, however, will cause a compilation error :
+//! ```compile_fail
+//! use tree_by_path::Node;
+//!
+//! #[derive(Debug)]
+//! struct NoClone {}
+//! 
+//! let mut n = Node::new(NoClone{});
+//! n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
+//! 
+//! // The below statement doesn't even compile :
+//! let nc = n.clone();
+//! ```
+//!
+//! # Example :
 //! ```
 //! use tree_by_path::{Node, PathError, TraverseAction};
 //!
@@ -115,50 +145,7 @@
 //! assert_eq!(12i8, sum);
 //!
 //! ```
-//!
-//! # Cloning
-//! `Node<C>` is clonable if type `C` is clonable :
-//! ```
-//! use tree_by_path::Node;
-//! let n = Node::new(20u8);
-//! let mut nc = n.clone();
-//! let root_path = n.get_first_path();
-//! let cloned_cargo = nc.borrow_mut_cargo(&root_path).unwrap();
-//! *cloned_cargo = 21u8;
-//! assert_eq!(&20u8, n.borrow_cargo(&root_path).unwrap());
-//! assert_eq!(&21u8, nc.borrow_cargo(&root_path).unwrap());
-//! ```
-//!
-//! Cloning a `Node<C>` instance having a non-clonable cargo, however, will cause a compilation error :
-//! ```compile_fail
-//! use tree_by_path::Node;
-//!
-//! #[derive(Debug)]
-//! struct NoClone {}
-//! 
-//! let mut n = Node::new(NoClone{});
-//! n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
-//! 
-//! // The below statement doesn't even compile :
-//! let nc = n.clone();
-//! ```
 //}
-
-/// A `TraverseAction` variant is expected as the return value of the callback closure or function
-/// passed to `Node`'s `traverse` or `traverse_back` methods.
-pub enum TraverseAction {
-    /// Tells the traverse* methods to continue traversing the tree.
-    Continue,
-
-    /// Tells the traverse method to skip all children of the node being handled by the callback
-    /// closure.
-    /// The traverse_back method, who visits a node's children first, will jump immediately to the
-    /// parent of the node being handled, thus skipping all preceding siblings.
-    SkipChildren,
-
-    /// Tells the traverse* methods to stop the tree traversal, so no more nodes will be visited.
-    Stop,
-}
 
 // { Documentation
 /// The easiest way to construct a Node is by using its associated function Node::new, immediately
@@ -213,8 +200,8 @@ impl<C> Node<C> {
     /// The cargo has to be passed immediately. If you need a tree with optional cargoes
     /// in the nodes, create a node having an `Option<Whatever>` as cargo.
     ///
-    /// Any node, with its subnodes, can  always be attached as a child to a tree having nodes of the
-    /// same cargo type.
+    /// Any node, with its subnodes, can  always be attached as a child to a node of a tree having nodes of the
+    /// same cargo type. (See the `add_node_*` methods.)
     // }
     pub fn new(cargo: C) -> Node<C> {
         Node {
@@ -504,7 +491,8 @@ impl<C> Node<C> {
     }
 
     // { Documentation
-    /// Looks for the tree's child node having the given path<br />
+    /// Looks for the tree's child node having the given path,<br />
+    /// tries and removes it<br />
     /// and returns either<br />
     /// `   Ok(removed_node_with_all_its_children)`<br />
     /// or<br />
@@ -854,7 +842,92 @@ impl<C> Node<C> {
         }
     }
 
-    pub fn swap_cargo(mut tree_root: Node<C>, path: &Vec<usize>, cargo: C) -> Result<(Node<C>, C), (PathError, C)> {
+    // { Documentation
+    /// Unlike method `swap_node`, `swap_cargo`
+    /// - is an associated function, to be called as `Node::swap_cargo(...)`;
+    /// - takes a `Node<C>` as a parameter, instead of a mutable reference;
+    /// - allows one to swap the cargo on a root node, instead of only on subnodes.
+    ///
+    /// The latter is also the reason why `swap_cargo` needs the target node to be moved into its
+    /// first parameter: swapping the cargo on a root node involves replacing that node with
+    /// another one.
+    ///
+    /// This also means that, if you want to swap the cargo on a node, you'll have to retrieve it from
+    /// the function's return value afterwards, or it will be dropped :
+    /// ```
+    /// use tree_by_path::{Node, PathError, TraverseAction};
+    ///
+    /// #[derive(Debug)]
+    /// struct NoCopy {
+    ///     value: u8,
+    /// }
+    /// 
+    /// let mut n = Node::new(NoCopy{value: 10});
+    /// let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
+    /// n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+    ///
+    /// n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
+    /// n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+    ///
+    /// let mut total = n.traverse(
+    ///     0u8,
+    ///     |accum, nd, _path| {
+    ///         *accum += nd.cargo.value;
+    ///         TraverseAction::Continue
+    ///     }
+    /// );
+    ///
+    /// assert_eq!(23u8, total);
+    ///
+    /// // Moving our root node n into swap_cargo's first parameter.
+    /// let swap_result = Node::swap_cargo(n, &vec![], NoCopy{value: 30u8});
+    ///
+    /// assert!(swap_result.is_ok());
+    ///
+    /// let old_cargo: NoCopy;
+    ///
+    /// // Getting our tree with root node n back.
+    /// (n, old_cargo) = swap_result.unwrap();
+    ///
+    /// assert_eq!(10, old_cargo.value);
+    ///
+    /// total = n.traverse(
+    ///     0u8,
+    ///     |accum, nd, _path| {
+    ///         *accum += nd.cargo.value;
+    ///         TraverseAction::Continue
+    ///     }
+    /// );
+    ///
+    /// assert_eq!(43u8, total);
+    ///
+    /// ```
+    ///
+    /// If ever the swap operation would fail, the node passed as first parameter is not lost and
+    /// can be retrieved from the `Err(...)` result :
+    ///
+    /// ```
+    /// use tree_by_path::{Node, PathError};
+    ///
+    /// let mut n = Node::new('g');
+    /// n.add_cargo_under(&vec![], 'o').unwrap();
+    ///
+    /// // Moving root node n into swap_cargo's first parameter ...
+    /// let result = Node::swap_cargo(n, &vec![5], 'a');
+    ///
+    /// assert!(result.is_err());
+    /// 
+    /// // ... and getting it back from the function's return value.
+    /// let (err, n, new_cargo) = result.unwrap_err();
+    /// assert_eq!(&'g', n.borrow_cargo(&vec![]).unwrap());
+    ///
+    /// assert_eq!(PathError::InputPathNotFound, err);
+    ///
+    /// // Besides, neither the new cargo not having been swapped is lost.
+    /// assert_eq!('a', new_cargo);
+    /// ```
+    // }
+    pub fn swap_cargo(mut tree_root: Node<C>, path: &Vec<usize>, cargo: C) -> Result<(Node<C>, C), (PathError, Node<C>, C)> {
 
         fn transfer_children<C>(source: &mut Node<C>, target: &mut Node<C>) -> Result<(), PathError> {
             let mut child: Node<C>;
@@ -881,32 +954,49 @@ impl<C> Node<C> {
         if is_swap_from_root {
             match transfer_children(&mut tree_root, &mut new_node) {
                 Ok(_) => (),
-                Err(err) => return Err((err, new_node.cargo)),
+                Err(err) => return Err((err, tree_root, new_node.cargo)),
             }
 
             Ok((new_node, tree_root.cargo))
         } else {
             let old_node = match tree_root.borrow_mut_node(path) {
                 Ok(node) => node,
-                Err(err) => return Err((err, new_node.cargo)),
+                Err(err) => return Err((err, tree_root, new_node.cargo)),
             };
             
             match transfer_children(old_node, &mut new_node) {
                 Ok(_) => (),
-                Err(err) => return Err((err, new_node.cargo)),
+                Err(err) => return Err((err, tree_root, new_node.cargo)),
             }
 
             match tree_root.swap_node(path, new_node) {
                 Ok(extracted_node) => Ok((tree_root, extracted_node.cargo)),
-                Err((err, new_nd)) => Err((err, new_nd.cargo)),
+                Err((err, new_nd)) => Err((err, tree_root, new_nd.cargo)),
             }
         }
     }
 
+    // { Documentation
+    /// Checks if a node has a subnode having the given path.
+    ///
+    /// You'll rarely want to call this method: all other methods accepting an input path return a
+    /// `Result::Err(...)` which will return cargo and nodes not inserted or swapped if the given
+    /// path is nonexistent or not fit for the operation.
+    ///
+    /// In most cases, if you use this method to prevent a subsequent method call to fail, you'll
+    /// just be doubling the processing involved in retrieving the node the path points at.
+    // }
     pub fn has_path(&self, path: &Vec<usize>) -> bool {
         self.borrow_node(path).is_ok()
     }
 
+    //{ Documentation
+    /// Returns a `NodeIterator<'it, C> : std::iter::Iterator` which allows iteration over immutable references to a tree's
+    /// cargoes.
+    ///
+    /// Note that use of the methods traverse and traverse_back is usually faster and more
+    /// flexible.
+    //}
     pub fn iter(&self) -> NodeIterator<C> {
         NodeIterator::new(self)
     }
@@ -1092,14 +1182,57 @@ where C: Clone {
     }
 }
 
+//{ Documentation
+/// A `TraverseAction` variant is expected as the return value of the callback closure or function
+/// passed to `Node`'s `traverse` or `traverse_back` methods.
+//}
+pub enum TraverseAction {
+    /// Tells the traverse* methods to continue traversing the tree.
+    Continue,
+
+    /// Tells the traverse method to skip all children of the node being handled by the callback
+    /// closure.
+    /// The traverse_back method, who visits a node's children first, will jump immediately to the
+    /// parent of the node being handled, thus skipping all preceding siblings.
+    SkipChildren,
+
+    /// Tells the traverse* methods to stop the tree traversal, so no more nodes will be visited.
+    Stop,
+}
+
 #[derive(PartialEq, Debug)]
 pub enum PathError {
+    /// Means that the path passed to a Node method doesn't exist.
     InputPathNotFound,
+
+    /// Means that, even if the path passed to a Node method does exist, the operation still can't
+    /// be performed. E.g.: no node can be added to a tree after the root node (only under it).
     InputPathNotFitForOperation,
+
+    /// Means that the output path that would be returned by a Node method doesn't exist. E.g.:
+    /// calling `Node.get_next_path(&the_path_of_the_last_node)`
     RequestedPathNotAvailable,
+
+    /// Means that an unforeseen error occurred. In theory, this should never happen.
+    /// (In theory, the difference between theory and practice is extremely small.<br />
+    /// In practice, however ...)
     ProcessError(String),
 }
 
+    //{ Documentation
+    /// `NodeIterator<'it, C> : std::iter::Iterator` allows iteration over immutable references to a tree's
+    /// cargoes.
+    ///
+    /// Note that use of the traverse and traverse_back methods is faster and allows for more flexibility, like
+    /// - skipping a node's children,
+    /// - prematurely stopping the iteration,
+    /// - inspecting the nodes' path,
+    /// - changing a node's cargo,
+    /// - changing a node's children collection.
+    ///
+    /// The order the nodes are iterated over by the `next` and `next_back` methods is the same as the
+    /// order used by the `Node.traverse` and `Node.traverse_back` methods.
+    //}
 pub struct NodeIterator<'it, C> {
     root: &'it Node<C>,
     current_path: Vec<usize>,
@@ -1107,6 +1240,7 @@ pub struct NodeIterator<'it, C> {
     back_current_path: Vec<usize>,
     back_is_fresh: bool,
 }
+
 impl<'it, C> NodeIterator<'it, C> {
     pub fn new(root: &'it Node<C>) -> NodeIterator<'it, C> {
         NodeIterator {
@@ -1169,6 +1303,7 @@ impl<'it, C> NodeIterator<'it, C> {
         has_next
     }
 }
+
 impl<'it, C> Iterator for NodeIterator<'it, C> {
     type Item = &'it C;
 
@@ -1181,6 +1316,7 @@ impl<'it, C> Iterator for NodeIterator<'it, C> {
         }
     }
 }
+
 impl<'it, C> DoubleEndedIterator for NodeIterator<'it, C> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let has_next = self.set_next_path(false);
@@ -2588,7 +2724,8 @@ mod tests {
         let result = Node::swap_cargo(n, &vec![5], 'a');
         assert!(result.is_err());
         
-        let old_cargo = result.unwrap_err().1;
+        let (_, n, old_cargo) = result.unwrap_err();
+        assert_eq!(&'g', n.borrow_cargo(&vec![]).unwrap());
         assert_eq!('a', old_cargo);
     }
 
