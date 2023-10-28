@@ -41,8 +41,8 @@
 //!
 //! These addresses are the paths meant in the crate's name.
 //!
-//! Use of these addresses, which are `Vec<usize>` objects accepted and returned by nearly all
-//! methods of `struct Node<C>`, allow code using this crate to hold one mutable reference to a
+//! Use of these addresses, which are `&Vec<usize>` objects accepted and returned by nearly all
+//! methods of `struct Node<C>`, allow code using this crate to hold only one mutable reference to a
 //! root node, without needing any other references, thus avoiding the need of holding on to
 //! multiple mutable references of nodes of the same tree, which would be prohibited by Rust's
 //! borrow checker.
