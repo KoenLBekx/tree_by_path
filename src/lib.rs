@@ -147,6 +147,8 @@
 //! ```
 //}
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 // { Documentation
 /// The easiest way to construct a Node is by using its associated function Node::new, immediately
 /// passing its cargo. As a tree consists of only Nodes, this first Node is a tree having one Node.
@@ -1172,6 +1174,46 @@ impl<C> Node<C> {
     }
 }
 
+impl <C> Node<CargoWithId<C>> {
+    pub fn new_with_id(cargo: C) -> Self {
+        Node::new(CargoWithId::new(cargo))
+    }
+
+    pub fn get_id(&self) -> usize {
+        self.cargo.id
+    }
+
+    pub fn add_cargo_under_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+        let cargo_with_id = CargoWithId::new(cargo);
+        let id = cargo_with_id.id;
+
+        match self.add_cargo_under(path, cargo_with_id) {
+            Ok(new_path) => Ok((new_path, id)),
+            Err((err, crg)) => Err((err, crg.cargo)),
+        }
+    }
+
+    pub fn add_cargo_after_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+        let cargo_with_id = CargoWithId::new(cargo);
+        let id = cargo_with_id.id;
+
+        match self.add_cargo_after(path, cargo_with_id) {
+            Ok(new_path) => Ok((new_path, id)),
+            Err((err, crg)) => Err((err, crg.cargo)),
+        }
+    }
+
+    pub fn add_cargo_before_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+        let cargo_with_id = CargoWithId::new(cargo);
+        let id = cargo_with_id.id;
+
+        match self.add_cargo_before(path, cargo_with_id) {
+            Ok(new_path) => Ok((new_path, id)),
+            Err((err, crg)) => Err((err, crg.cargo)),
+        }
+    }
+}
+
 impl<C> Clone for Node<C>
 where C: Clone {
     fn clone(&self) -> Self {
@@ -1198,6 +1240,36 @@ pub enum TraverseAction {
 
     /// Tells the traverse* methods to stop the tree traversal, so no more nodes will be visited.
     Stop,
+}
+
+pub struct CargoWithId<Crg> {
+    id: usize,
+    cargo: Crg,
+}
+
+impl <Crg> CargoWithId<Crg> {
+    pub fn new(subcargo: Crg) -> Self {
+        CargoWithId {
+            id: Self::get_next_id(),
+            cargo: subcargo,
+        }
+    }
+
+    pub fn get_next_id() -> usize {
+        static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+        let return_value = ID_COUNTER.load(Ordering::SeqCst);
+        ID_COUNTER.store(return_value + 1, Ordering::SeqCst);
+
+        return_value
+    }
+}
+
+impl<Crg> Clone for CargoWithId<Crg>
+where Crg: Clone {
+    fn clone(&self) -> Self {
+        CargoWithId::new(self.cargo.clone())
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -2727,6 +2799,139 @@ mod tests {
         let (_, n, old_cargo) = result.unwrap_err();
         assert_eq!(&'g', n.borrow_cargo(&vec![]).unwrap());
         assert_eq!('a', old_cargo);
+    }
+
+    #[test]
+    fn cargo_with_id_get_next_id() {
+        let mut id: usize;
+        let mut last_id = CargoWithId::<u8>::get_next_id();
+
+        for _ in 0usize..5 {
+            id = CargoWithId::<u8>::get_next_id();
+            assert!(last_id < id);
+            last_id = id;
+        }
+    }
+
+    #[test]
+    fn cargo_with_id_new() {
+        let mut cwi: CargoWithId<bool>;
+        let mut last_id = CargoWithId::<u8>::get_next_id();
+
+        for _ in 0usize..5 {
+            cwi = CargoWithId::new(true);
+            assert!(last_id < cwi.id);
+            last_id = cwi.id;
+        }
+    }
+
+    #[test]
+    fn cargo_with_id_clone() {
+        let c1 = CargoWithId::new(25u8);
+        let c2 = c1.clone();
+
+        assert_eq!(c1.cargo, c2.cargo);
+        assert_ne!(c1.id, c2.id);
+    }
+
+    #[test]
+    fn node_with_id_clone() {
+        let n1 = Node::new_with_id(25u8);
+        let n2 = n1.clone();
+
+        assert_eq!(n1.cargo.cargo, n2.cargo.cargo);
+        assert_ne!(n1.get_id(), n2.get_id());
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_under_with_id() {
+        let mut n = Node::new_with_id(0u8);
+        let id: usize;
+        let path: Vec<usize>;
+
+        let result = n.add_cargo_under_with_id(&vec![], 1);
+        assert!(result.is_ok());
+
+        (path, id) = result.unwrap();
+        assert_eq!(vec![0], path);
+        
+        let crg = n.borrow_cargo(&vec![0]).unwrap();
+        assert_eq!(crg.id, id);
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_under_with_id_wrong_path() {
+        let mut n = Node::new_with_id(0u8);
+        let crg: u8;
+
+        let result = n.add_cargo_under_with_id(&vec![4, 7], 1u8);
+        assert!(result.is_err());
+
+        (_, crg) = result.unwrap_err();
+        assert_eq!(1u8, crg);
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_after_with_id() {
+        let mut n = Node::new_with_id(0u8);
+        let id: usize;
+        let path: Vec<usize>;
+
+        n.add_cargo_under_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_after_with_id(&vec![0], 2);
+
+        (path, id) = result.unwrap();
+        assert_eq!(vec![1], path);
+        
+        let crg = n.borrow_cargo(&vec![1]).unwrap();
+        assert_eq!(crg.id, id);
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_after_with_id_wrong_path() {
+        let mut n = Node::new_with_id(0u8);
+        let crg: u8;
+
+        n.add_cargo_under_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_after_with_id(&vec![4], 2u8);
+        assert!(result.is_err());
+
+        (_, crg) = result.unwrap_err();
+        assert_eq!(2u8, crg);
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_before_with_id() {
+        let mut n = Node::new_with_id(0u8);
+        let id: usize;
+        let path: Vec<usize>;
+
+        n.add_cargo_under_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_before_with_id(&vec![0], 2);
+
+        (path, id) = result.unwrap();
+        assert_eq!(vec![0], path);
+        
+        let crg = n.borrow_cargo(&vec![0]).unwrap();
+        assert_eq!(crg.id, id);
+    }
+
+    #[test]
+    fn node_with_id_add_cargo_before_with_id_wrong_path() {
+        let mut n = Node::new_with_id(0u8);
+        let crg: u8;
+
+        n.add_cargo_under_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_before_with_id(&vec![4], 2u8);
+        assert!(result.is_err());
+
+        (_, crg) = result.unwrap_err();
+        assert_eq!(2u8, crg);
+    }
+
+    #[test]
+    fn node_with_id_search_found() {
+        // TODO: write test
     }
 
     // Testing some assumptions about vector comparisons.
