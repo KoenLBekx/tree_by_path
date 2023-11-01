@@ -1,3 +1,13 @@
+// TODO : change version to 1.1.0.
+// TODO : add methods borrow_mut_cargo_(get_path_)by_id.
+// TODO : add borrow_(mut_)node_(get_path_)by_id.
+// TODO : add method extract_node_by_id
+// TODO : add method has_id
+// TODO : add method set_cargo_by_id
+// TODO : rename fn traverse to fn traverse_mut and create a immutably traversing fn traverse.
+//          And idem for traverse_back.
+// TODO : Complete documentation about id-related structs and methods.
+
 //{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
 //! who in turn may or may not have other `Node<C>` children etc.
@@ -1189,7 +1199,7 @@ impl <C> Node<CargoWithId<C>> {
 
         match self.add_cargo_under(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.cargo)),
+            Err((err, crg)) => Err((err, crg.subcargo)),
         }
     }
 
@@ -1199,7 +1209,7 @@ impl <C> Node<CargoWithId<C>> {
 
         match self.add_cargo_after(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.cargo)),
+            Err((err, crg)) => Err((err, crg.subcargo)),
         }
     }
 
@@ -1209,7 +1219,37 @@ impl <C> Node<CargoWithId<C>> {
 
         match self.add_cargo_before(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.cargo)),
+            Err((err, crg)) => Err((err, crg.subcargo)),
+        }
+    }
+
+    pub fn borrow_cargo_get_path_by_id(&self, id: &usize) -> Result<(&C, Vec<usize>), PathError> {
+        let mut current_path = self.get_first_path();
+        let mut current_node: &Node<CargoWithId<C>>;
+        let mut result = Err(PathError::InputIdNotFound);
+
+        loop {
+            current_node = self.borrow_node(&current_path)
+                .expect("While traversing, borrowing a node should never yield Result::Err.");
+
+            if &current_node.cargo.id == id {
+                result = Ok((&current_node.cargo.subcargo, current_path));
+                break;
+            }
+
+            current_path = match self.get_next_path(&current_path) {
+                Ok(p) => p,
+                _ => break,
+            }
+        }
+
+        result
+    }
+
+    pub fn borrow_cargo_by_id(&self, id: &usize) -> Result<&C, PathError> {
+        match self.borrow_cargo_get_path_by_id(id) {
+            Ok((crg, _)) => Ok(crg),
+            Err(err) => Err(err),
         }
     }
 }
@@ -1244,14 +1284,14 @@ pub enum TraverseAction {
 
 pub struct CargoWithId<Crg> {
     id: usize,
-    cargo: Crg,
+    subcargo: Crg,
 }
 
 impl <Crg> CargoWithId<Crg> {
     pub fn new(subcargo: Crg) -> Self {
         CargoWithId {
             id: Self::get_next_id(),
-            cargo: subcargo,
+            subcargo: subcargo,
         }
     }
 
@@ -1268,7 +1308,7 @@ impl <Crg> CargoWithId<Crg> {
 impl<Crg> Clone for CargoWithId<Crg>
 where Crg: Clone {
     fn clone(&self) -> Self {
-        CargoWithId::new(self.cargo.clone())
+        CargoWithId::new(self.subcargo.clone())
     }
 }
 
@@ -1284,6 +1324,9 @@ pub enum PathError {
     /// Means that the output path that would be returned by a Node method doesn't exist. E.g.:
     /// calling `Node.get_next_path(&the_path_of_the_last_node)`
     RequestedPathNotAvailable,
+
+    /// Means that the id passed to a method of a Node<CargoWithId<C>> wasn't found in the tree.
+    InputIdNotFound,
 
     /// Means that an unforeseen error occurred. In theory, this should never happen.
     /// (In theory, the difference between theory and practice is extremely small.<br />
@@ -2830,7 +2873,7 @@ mod tests {
         let c1 = CargoWithId::new(25u8);
         let c2 = c1.clone();
 
-        assert_eq!(c1.cargo, c2.cargo);
+        assert_eq!(c1.subcargo, c2.subcargo);
         assert_ne!(c1.id, c2.id);
     }
 
@@ -2839,7 +2882,7 @@ mod tests {
         let n1 = Node::new_with_id(25u8);
         let n2 = n1.clone();
 
-        assert_eq!(n1.cargo.cargo, n2.cargo.cargo);
+        assert_eq!(n1.cargo.subcargo, n2.cargo.subcargo);
         assert_ne!(n1.get_id(), n2.get_id());
     }
 
@@ -2930,8 +2973,47 @@ mod tests {
     }
 
     #[test]
-    fn node_with_id_search_found() {
-        // TODO: write test
+    fn node_with_id_borrow_cargo_get_path_by_id() {
+        let mut n = Node::new_with_id(10);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_cargo_get_path_by_id(&new_id);
+        assert!(result.is_ok());
+
+        let (&found_cargo, found_path) = result.unwrap();
+        assert_eq!(13, found_cargo);
+        assert_eq!(vec![1, 0], found_path);
+    }
+
+    #[test]
+    fn node_with_id_borrow_cargo_get_path_by_wrong_id() {
+        let mut n = Node::new_with_id(10);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_cargo_get_path_by_id(&(new_id + 20));
+        assert!(result.is_err());
+        assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
+    }
+
+    #[test]
+    fn node_with_id_borrow_cargo_by_id() {
+        let mut n = Node::new_with_id(10);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_cargo_by_id(&new_id);
+        assert!(result.is_ok());
+
+        let &found_cargo = result.unwrap();
+        assert_eq!(13, found_cargo);
     }
 
     // Testing some assumptions about vector comparisons.
