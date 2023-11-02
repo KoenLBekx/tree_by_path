@@ -1,12 +1,15 @@
-// TODO : change version to 1.1.0.
-// TODO : add methods borrow_mut_cargo_(get_path_)by_id.
+//{ TODOs
 // TODO : add borrow_(mut_)node_(get_path_)by_id.
+// TODO : rename methods add_cargo_under, add_cargo_after, add_cargo_before to *_path
+// TODO : do the same renames for add_node_*
+// TODO : add methods add_cargo_under_id, add_cargo_after_id, add_cargo_before_id
 // TODO : add method extract_node_by_id
 // TODO : add method has_id
 // TODO : add method set_cargo_by_id
 // TODO : rename fn traverse to fn traverse_mut and create a immutably traversing fn traverse.
 //          And idem for traverse_back.
 // TODO : Complete documentation about id-related structs and methods.
+//}
 
 //{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
@@ -1246,8 +1249,37 @@ impl <C> Node<CargoWithId<C>> {
         result
     }
 
+    pub fn borrow_mut_cargo_get_path_by_id(&mut self, id: &usize) -> Result<(&mut C, Vec<usize>), PathError> {
+        match self.traverse(
+            Option::<Vec<usize>>::None,
+            |accum, nd, path| {
+                if nd.cargo.id == *id {
+                    *accum = Some(path.clone());
+                    TraverseAction::Stop
+                } else {
+                    TraverseAction::Continue
+                }
+            }
+        ) {
+            None => Err(PathError::InputIdNotFound),
+            Some(pth) => Ok((
+                &mut self.borrow_mut_cargo(&pth)
+                    .expect("borrow_mut_cargo_get_path_by_id: Looking for a previously found path shouldn't fail.")
+                    .subcargo,
+                pth
+            )),
+        }
+    }
+
     pub fn borrow_cargo_by_id(&self, id: &usize) -> Result<&C, PathError> {
         match self.borrow_cargo_get_path_by_id(id) {
+            Ok((crg, _)) => Ok(crg),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn borrow_mut_cargo_by_id(&mut self, id: &usize) -> Result<&mut C, PathError> {
+        match self.borrow_mut_cargo_get_path_by_id(id) {
             Ok((crg, _)) => Ok(crg),
             Err(err) => Err(err),
         }
@@ -1295,7 +1327,7 @@ impl <Crg> CargoWithId<Crg> {
         }
     }
 
-    pub fn get_next_id() -> usize {
+    fn get_next_id() -> usize {
         static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
         let return_value = ID_COUNTER.load(Ordering::SeqCst);
@@ -3002,6 +3034,45 @@ mod tests {
     }
 
     #[test]
+    fn node_with_id_borrow_mut_cargo_get_path_by_id() {
+        let mut n = Node::new_with_id(10u8);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        {
+            let result = n.borrow_mut_cargo_get_path_by_id(&new_id);
+            assert!(result.is_ok());
+
+            let (found_cargo, found_path) = result.unwrap();
+            assert_eq!(&13, found_cargo);
+            assert_eq!(vec![1, 0], found_path);
+
+            *found_cargo = 100u8;
+        }
+
+        let result2 = n.borrow_cargo_get_path_by_id(&new_id);
+        assert!(result2.is_ok());
+        let (found_cargo2, found_path2) = result2.unwrap();
+        assert_eq!(&100u8, found_cargo2);
+        assert_eq!(vec![1, 0], found_path2);
+    }
+
+    #[test]
+    fn node_with_id_borrow_mut_cargo_get_path_by_wrong_id() {
+        let mut n = Node::new_with_id(10u8);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_mut_cargo_get_path_by_id(&(new_id + 10));
+        assert!(result.is_err());
+        assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
+    }
+
+    #[test]
     fn node_with_id_borrow_cargo_by_id() {
         let mut n = Node::new_with_id(10);
         let root_path = vec![];
@@ -3014,6 +3085,29 @@ mod tests {
 
         let &found_cargo = result.unwrap();
         assert_eq!(13, found_cargo);
+    }
+
+    #[test]
+    fn node_with_id_borrow_mut_cargo_by_id() {
+        let mut n = Node::new_with_id(10u8);
+        let root_path = vec![];
+        n.add_cargo_under_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+
+        {
+            let result = n.borrow_mut_cargo_by_id(&new_id);
+            assert!(result.is_ok());
+
+            let found_cargo = result.unwrap();
+            assert_eq!(&13u8, found_cargo);
+
+            *found_cargo = 200;
+        }
+
+        let result2 = n.borrow_cargo_by_id(&new_id);
+        assert!(result2.is_ok());
+        assert_eq!(&200u8, result2.unwrap());
     }
 
     // Testing some assumptions about vector comparisons.
