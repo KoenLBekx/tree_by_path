@@ -1,7 +1,4 @@
 //{ TODOs
-// TODO : add borrow_(mut_)node_(get_path_)by_id.
-// TODO : rename methods add_cargo_under, add_cargo_after, add_cargo_before to *_path
-// TODO : do the same renames for add_node_*
 // TODO : add methods add_cargo_under_id, add_cargo_after_id, add_cargo_before_id
 // TODO : add method extract_node_by_id
 // TODO : add method has_id
@@ -86,7 +83,7 @@
 //! struct NoClone {}
 //! 
 //! let mut n = Node::new(NoClone{});
-//! n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
+//! n.add_cargo_under_path(&Vec::<usize>::new(), NoClone{}).unwrap();
 //! 
 //! // The below statement doesn't even compile :
 //! let nc = n.clone();
@@ -101,24 +98,24 @@
 //! let mut result_path: Vec<usize>;
 //! 
 //! // Adding a node with specified cargo after a node which doesn't exist yet :
-//! result = n.add_cargo_after(&vec![0], 1);
+//! result = n.add_cargo_after_path(&vec![0], 1);
 //! assert!(result.is_err());
 //! assert_eq!((PathError::RequestedPathNotAvailable, 1), result.unwrap_err());
 //! 
 //! // Now we create a node that will have address [0] :
-//! result = n.add_cargo_under(&vec![], 1);
+//! result = n.add_cargo_under_path(&vec![], 1);
 //! assert!(result.is_ok());
 //! result_path = result.unwrap();
 //! assert_eq!(vec![0], result_path);
 //! 
 //! // So now we can add a node after the one having address [0] :
-//! result = n.add_cargo_after(&vec![0], 2);
+//! result = n.add_cargo_after_path(&vec![0], 2);
 //! assert!(result.is_ok());
 //! result_path = result.unwrap();
 //! assert_eq!(vec![1], result_path);
 //! assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
 //! 
-//! result = n.add_cargo_after(&vec![0], 3);
+//! result = n.add_cargo_after_path(&vec![0], 3);
 //! assert!(result.is_ok());
 //! result_path = result.unwrap();
 //! assert_eq!(vec![1], result_path);
@@ -177,16 +174,16 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 ///
 /// // n is a one-node tree now. Let's add a child node by passing a cargo.
 /// let root_path = n.get_first_path();
-/// n.add_cargo_under(&root_path, 'b').expect(
+/// n.add_cargo_under_path(&root_path, 'b').expect(
 ///     "It should always be possible to add a node under the root node");
 ///
 /// // Let's create another small tree having cargoes of the same type.
 /// let mut n2 = Node::new('c');
-/// n2.add_cargo_under(&root_path, 'd').expect(
+/// n2.add_cargo_under_path(&root_path, 'd').expect(
 ///     "It should always be possible to add a node under the root node");
 ///
 /// // Now we add the second tree's root node as a child to the first tree's root node :
-/// n.add_node_under(&root_path, n2).expect(
+/// n.add_node_under_path(&root_path, n2).expect(
 ///     "It should always be possible to add a node under the root node");
 ///
 /// // Concatenating all of the tree's nodes' cargoes :
@@ -276,10 +273,10 @@ impl<C> Node<C> {
     /// let mut n = Node::new("Brussels".to_string());
     /// let root_path = Vec::<usize>::new();
     ///
-    /// let ghent_path = n.add_cargo_under(&root_path, "Ghent".to_string()).expect(
+    /// let ghent_path = n.add_cargo_under_path(&root_path, "Ghent".to_string()).expect(
     ///     "Error adding node under root node");
     ///
-    /// let antwerp_path = n.add_cargo_under(&root_path, "Antwerp".to_string()).expect(
+    /// let antwerp_path = n.add_cargo_under_path(&root_path, "Antwerp".to_string()).expect(
     ///     "Error adding node under root node");
     ///
     /// assert_eq!(Ok(antwerp_path.clone()), n.get_next_path(&ghent_path));
@@ -385,20 +382,20 @@ impl<C> Node<C> {
     /// let mut n = Node::new(0u8);
     /// let mut result: Result<Vec<usize>, (PathError, u8)>;
     ///
-    /// result = n.add_cargo_under(&vec![], 1);
+    /// result = n.add_cargo_under_path(&vec![], 1);
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0], result.unwrap());
     ///
-    /// result = n.add_cargo_under(&vec![], 2);
+    /// result = n.add_cargo_under_path(&vec![], 2);
     /// assert!(result.is_ok());
     /// assert_eq!(vec![1], result.unwrap());
     /// assert_eq!(&2, n.borrow_cargo(&vec![1]).unwrap());
     ///
-    /// result = n.add_cargo_under(&vec![0], 3);
+    /// result = n.add_cargo_under_path(&vec![0], 3);
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0, 0], result.unwrap());
     ///
-    /// result = n.add_cargo_under(&vec![0], 4);
+    /// result = n.add_cargo_under_path(&vec![0], 4);
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0, 1], result.unwrap());
     ///
@@ -406,16 +403,16 @@ impl<C> Node<C> {
     /// assert!(borrowed.is_ok());
     /// assert_eq!(&4, borrowed.unwrap());
     ///
-    /// result = n.add_cargo_under(&vec![50], 99);
+    /// result = n.add_cargo_under_path(&vec![50], 99);
     /// assert!(result.is_err());
     /// assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
     ///
-    /// result = n.add_cargo_under(&vec![0, 1, 1], 99);
+    /// result = n.add_cargo_under_path(&vec![0, 1, 1], 99);
     /// assert!(result.is_err());
     /// assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
     /// ```
     // }
-    pub fn add_cargo_under(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
+    pub fn add_cargo_under_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         let mut result_path = path.clone();
         let borrowed = self.borrow_mut_node(path);
 
@@ -443,7 +440,7 @@ impl<C> Node<C> {
     /// `Err((PathError::InputPathNotFitForOperation, cargo_not_having_been_moved_into_tree))`,<br />
     /// as a tree's root node can't have siblings.
     // }
-    pub fn add_cargo_after(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
+    pub fn add_cargo_after_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, cargo));
         }
@@ -480,7 +477,7 @@ impl<C> Node<C> {
     /// `Err((PathError::InputPathNotFitForOperation, cargo_not_having_been_moved_into_tree))`,<br />
     /// as a tree's root node can't have siblings.
     // }
-    pub fn add_cargo_before(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
+    pub fn add_cargo_before_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, cargo));
         }
@@ -522,17 +519,17 @@ impl<C> Node<C> {
     /// let mut n = Node::new(("Jane Kirby", "CEO"));
     /// let root_path = n.get_first_path();
     ///
-    /// let cfo_path = n.add_cargo_under(
+    /// let cfo_path = n.add_cargo_under_path(
     ///     &root_path,
     ///     ("Rob Delsing", "CFO")
     /// ).unwrap();
     ///
-    /// let account_path = n.add_cargo_under(
+    /// let account_path = n.add_cargo_under_path(
     ///     &cfo_path,
     ///     ("Pierre Lévèque", "Head of Accounting")
     /// ).unwrap();
     ///
-    /// let cio_path = n.add_cargo_under(
+    /// let cio_path = n.add_cargo_under_path(
     ///     &root_path,
     ///     ("Dilshat Ahmetova", "CFO")
     /// ).unwrap();
@@ -587,20 +584,20 @@ impl<C> Node<C> {
     /// let mut n = Node::new(0u8);
     /// let mut result: Result<Vec<usize>, (PathError, Node<u8>)>;
     ///
-    /// result = n.add_node_under(&vec![], Node::new(1));
+    /// result = n.add_node_under_path(&vec![], Node::new(1));
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0], result.unwrap());
     ///
-    /// result = n.add_node_under(&vec![], Node::new(2));
+    /// result = n.add_node_under_path(&vec![], Node::new(2));
     /// assert!(result.is_ok());
     /// assert_eq!(vec![1], result.unwrap());
     /// assert_eq!(&2, n.borrow_cargo(&vec![1]).unwrap());
     ///
-    /// result = n.add_node_under(&vec![0], Node::new(3));
+    /// result = n.add_node_under_path(&vec![0], Node::new(3));
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0, 0], result.unwrap());
     ///
-    /// result = n.add_node_under(&vec![0], Node::new(4));
+    /// result = n.add_node_under_path(&vec![0], Node::new(4));
     /// assert!(result.is_ok());
     /// assert_eq!(vec![0, 1], result.unwrap());
     ///
@@ -608,16 +605,16 @@ impl<C> Node<C> {
     /// assert!(borrowed.is_ok());
     /// assert_eq!(&4, borrowed.unwrap());
     ///
-    /// result = n.add_node_under(&vec![50], Node::new(99));
+    /// result = n.add_node_under_path(&vec![50], Node::new(99));
     /// assert!(result.is_err());
     /// assert_eq!((PathError::InputPathNotFound, Node::new(99)), result.unwrap_err());
     ///
-    /// result = n.add_node_under(&vec![0, 1, 1], Node::new(99));
+    /// result = n.add_node_under_path(&vec![0, 1, 1], Node::new(99));
     /// assert!(result.is_err());
     /// assert_eq!((PathError::InputPathNotFound, Node::new(99)), result.unwrap_err());
     /// ```
     // }
-    pub fn add_node_under(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
+    pub fn add_node_under_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         let mut result_path = path.clone();
         let borrowed = self.borrow_mut_node(path);
 
@@ -645,7 +642,7 @@ impl<C> Node<C> {
     /// `Err((PathError::InputPathNotFitForOperation, node_not_having_been_moved_into_tree))`,<br />
     /// as a tree's root node can't have siblings.
     // }
-    pub fn add_node_after(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
+    pub fn add_node_after_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, node));
         }
@@ -682,7 +679,7 @@ impl<C> Node<C> {
     /// `Err((PathError::InputPathNotFitForOperation, node_not_having_been_moved_into_tree))`,<br />
     /// as a tree's root node can't have siblings.
     // }
-    pub fn add_node_before(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
+    pub fn add_node_before_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
         if path.len() == 0 {
             return Err((PathError::InputPathNotFitForOperation, node));
         }
@@ -760,11 +757,11 @@ impl<C> Node<C> {
     /// let root_path = Vec::<usize>::new();
     /// let mut added_path: Vec<usize>;
     ///
-    /// added_path = n.add_cargo_under(&root_path, "Thessaloniki").unwrap();
-    /// added_path = n.add_cargo_under(&added_path, "Kilkis").unwrap();
+    /// added_path = n.add_cargo_under_path(&root_path, "Thessaloniki").unwrap();
+    /// added_path = n.add_cargo_under_path(&added_path, "Kilkis").unwrap();
     ///
-    /// added_path = n.add_cargo_under(&root_path, "Kavala").unwrap();
-    /// added_path = n.add_cargo_under(&added_path, "Moustheni").unwrap();
+    /// added_path = n.add_cargo_under_path(&root_path, "Kavala").unwrap();
+    /// added_path = n.add_cargo_under_path(&added_path, "Moustheni").unwrap();
     ///
     /// let borrow_result = n.borrow_cargo(&vec![1, 0]);
     ///
@@ -797,11 +794,11 @@ impl<C> Node<C> {
     /// let root_path = Vec::<usize>::new();
     /// let mut added_path: Vec<usize>;
     ///
-    /// added_path = n.add_cargo_under(&root_path, "Thessaloniki").unwrap();
-    /// added_path = n.add_cargo_under(&added_path, "Kilkis").unwrap();
+    /// added_path = n.add_cargo_under_path(&root_path, "Thessaloniki").unwrap();
+    /// added_path = n.add_cargo_under_path(&added_path, "Kilkis").unwrap();
     ///
-    /// added_path = n.add_cargo_under(&root_path, "Kavala").unwrap();
-    /// added_path = n.add_cargo_under(&added_path, "Moustheni").unwrap();
+    /// added_path = n.add_cargo_under_path(&root_path, "Kavala").unwrap();
+    /// added_path = n.add_cargo_under_path(&added_path, "Moustheni").unwrap();
     ///
     /// let mut borrow_result = n.borrow_mut_cargo(&vec![1, 0]);
     /// assert!(borrow_result.is_ok());
@@ -838,8 +835,8 @@ impl<C> Node<C> {
     /// use tree_by_path::Node;
     ///
     /// let mut n = Node::new('a');
-    /// n.add_cargo_under(&vec![], 'b').unwrap();
-    /// n.add_cargo_under(&vec![], 'c').unwrap();
+    /// n.add_cargo_under_path(&vec![], 'b').unwrap();
+    /// n.add_cargo_under_path(&vec![], 'c').unwrap();
     ///
     /// let result = n.set_cargo(&vec![1], 'z');
     ///
@@ -878,11 +875,11 @@ impl<C> Node<C> {
     /// }
     /// 
     /// let mut n = Node::new(NoCopy{value: 10});
-    /// let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
-    /// n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+    /// let added_path = n.add_cargo_under_path(&vec![], NoCopy{value: 1}).unwrap();
+    /// n.add_cargo_under_path(&vec![], NoCopy{value: 7}).unwrap();
     ///
-    /// n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
-    /// n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+    /// n.add_cargo_under_path(&added_path, NoCopy{value: 2}).unwrap();
+    /// n.add_cargo_under_path(&added_path, NoCopy{value: 3}).unwrap();
     ///
     /// let mut total = n.traverse(
     ///     0u8,
@@ -925,7 +922,7 @@ impl<C> Node<C> {
     /// use tree_by_path::{Node, PathError};
     ///
     /// let mut n = Node::new('g');
-    /// n.add_cargo_under(&vec![], 'o').unwrap();
+    /// n.add_cargo_under_path(&vec![], 'o').unwrap();
     ///
     /// // Moving root node n into swap_cargo's first parameter ...
     /// let result = Node::swap_cargo(n, &vec![5], 'a');
@@ -1039,11 +1036,11 @@ impl<C> Node<C> {
     /// use tree_by_path::{Node, TraverseAction};
     ///
     /// let mut n = Node::new(0);
-    /// n.add_cargo_under(&vec![], 1).unwrap();
-    /// n.add_cargo_under(&vec![], 2).unwrap();
-    /// n.add_cargo_under(&vec![1], 3).unwrap();
-    /// n.add_cargo_under(&vec![1], 4).unwrap();
-    /// n.add_cargo_under(&vec![], 5).unwrap();
+    /// n.add_cargo_under_path(&vec![], 1).unwrap();
+    /// n.add_cargo_under_path(&vec![], 2).unwrap();
+    /// n.add_cargo_under_path(&vec![1], 3).unwrap();
+    /// n.add_cargo_under_path(&vec![1], 4).unwrap();
+    /// n.add_cargo_under_path(&vec![], 5).unwrap();
     ///
     /// let outcome = n.traverse(
     ///     0,
@@ -1196,37 +1193,37 @@ impl <C> Node<CargoWithId<C>> {
         self.cargo.id
     }
 
-    pub fn add_cargo_under_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+    pub fn add_cargo_under_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
         let cargo_with_id = CargoWithId::new(cargo);
         let id = cargo_with_id.id;
 
-        match self.add_cargo_under(path, cargo_with_id) {
+        match self.add_cargo_under_path(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
             Err((err, crg)) => Err((err, crg.subcargo)),
         }
     }
 
-    pub fn add_cargo_after_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+    pub fn add_cargo_after_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
         let cargo_with_id = CargoWithId::new(cargo);
         let id = cargo_with_id.id;
 
-        match self.add_cargo_after(path, cargo_with_id) {
+        match self.add_cargo_after_path(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
             Err((err, crg)) => Err((err, crg.subcargo)),
         }
     }
 
-    pub fn add_cargo_before_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
+    pub fn add_cargo_before_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
         let cargo_with_id = CargoWithId::new(cargo);
         let id = cargo_with_id.id;
 
-        match self.add_cargo_before(path, cargo_with_id) {
+        match self.add_cargo_before_path(path, cargo_with_id) {
             Ok(new_path) => Ok((new_path, id)),
             Err((err, crg)) => Err((err, crg.subcargo)),
         }
     }
 
-    pub fn borrow_cargo_get_path_by_id(&self, id: &usize) -> Result<(&C, Vec<usize>), PathError> {
+    pub fn borrow_cargo_and_get_path_by_id(&self, id: &usize) -> Result<(&C, Vec<usize>), PathError> {
         let mut current_path = self.get_first_path();
         let mut current_node: &Node<CargoWithId<C>>;
         let mut result = Err(PathError::InputIdNotFound);
@@ -1249,7 +1246,7 @@ impl <C> Node<CargoWithId<C>> {
         result
     }
 
-    pub fn borrow_mut_cargo_get_path_by_id(&mut self, id: &usize) -> Result<(&mut C, Vec<usize>), PathError> {
+    pub fn borrow_mut_cargo_and_get_path_by_id(&mut self, id: &usize) -> Result<(&mut C, Vec<usize>), PathError> {
         match self.traverse(
             Option::<Vec<usize>>::None,
             |accum, nd, path| {
@@ -1264,7 +1261,7 @@ impl <C> Node<CargoWithId<C>> {
             None => Err(PathError::InputIdNotFound),
             Some(pth) => Ok((
                 &mut self.borrow_mut_cargo(&pth)
-                    .expect("borrow_mut_cargo_get_path_by_id: Looking for a previously found path shouldn't fail.")
+                    .expect("borrow_mut_cargo_and_get_path_by_id: Looking for a previously found path shouldn't fail.")
                     .subcargo,
                 pth
             )),
@@ -1272,15 +1269,73 @@ impl <C> Node<CargoWithId<C>> {
     }
 
     pub fn borrow_cargo_by_id(&self, id: &usize) -> Result<&C, PathError> {
-        match self.borrow_cargo_get_path_by_id(id) {
+        match self.borrow_cargo_and_get_path_by_id(id) {
             Ok((crg, _)) => Ok(crg),
             Err(err) => Err(err),
         }
     }
 
     pub fn borrow_mut_cargo_by_id(&mut self, id: &usize) -> Result<&mut C, PathError> {
-        match self.borrow_mut_cargo_get_path_by_id(id) {
+        match self.borrow_mut_cargo_and_get_path_by_id(id) {
             Ok((crg, _)) => Ok(crg),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn borrow_node_and_get_path_by_id(&self, id: &usize) -> Result<(&Node<CargoWithId<C>>, Vec<usize>), PathError> {
+        let mut current_path = self.get_first_path();
+        let mut current_node: &Node<CargoWithId<C>>;
+        let mut result = Err(PathError::InputIdNotFound);
+
+        loop {
+            current_node = self.borrow_node(&current_path)
+                .expect("While traversing, borrowing a node should never yield Result::Err.");
+
+            if &current_node.cargo.id == id {
+                result = Ok((current_node, current_path));
+                break;
+            }
+
+            current_path = match self.get_next_path(&current_path) {
+                Ok(p) => p,
+                _ => break,
+            }
+        }
+
+        result
+    }
+
+    pub fn borrow_mut_node_and_get_path_by_id(&mut self, id: &usize) -> Result<(&mut Node<CargoWithId<C>>, Vec<usize>), PathError> {
+        match self.traverse(
+            Option::<Vec<usize>>::None,
+            |accum, nd, path| {
+                if nd.cargo.id == *id {
+                    *accum = Some(path.clone());
+                    TraverseAction::Stop
+                } else {
+                    TraverseAction::Continue
+                }
+            }
+        ) {
+            None => Err(PathError::InputIdNotFound),
+            Some(pth) => Ok((
+                self.borrow_mut_node(&pth)
+                    .expect("borrow_mut_node_and_get_path_by_id: Looking for a previously found path shouldn't fail."),
+                pth
+            )),
+        }
+    }
+
+    pub fn borrow_node_by_id(&self, id: &usize) -> Result<&Node<CargoWithId<C>>, PathError> {
+        match self.borrow_node_and_get_path_by_id(id) {
+            Ok((nd, _)) => Ok(nd),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn borrow_mut_node_by_id(&mut self, id: &usize) -> Result<&mut Node<CargoWithId<C>>, PathError> {
+        match self.borrow_mut_node_and_get_path_by_id(id) {
+            Ok((nd, _)) => Ok(nd),
             Err(err) => Err(err),
         }
     }
@@ -1661,24 +1716,24 @@ mod tests {
     }
 
     #[test]
-    fn node_add_cargo_under() {
+    fn node_add_cargo_under_path() {
         let mut n = Node::new(0u8);
         let mut result: Result<Vec<usize>, (PathError, u8)>;
 
-        result = n.add_cargo_under(&vec![], 1);
+        result = n.add_cargo_under_path(&vec![], 1);
         assert!(result.is_ok());
         assert_eq!(vec![0], result.unwrap());
 
-        result = n.add_cargo_under(&vec![], 2);
+        result = n.add_cargo_under_path(&vec![], 2);
         assert!(result.is_ok());
         assert_eq!(vec![1], result.unwrap());
         assert_eq!(&2, n.borrow_cargo(&vec![1]).unwrap());
 
-        result = n.add_cargo_under(&vec![0], 3);
+        result = n.add_cargo_under_path(&vec![0], 3);
         assert!(result.is_ok());
         assert_eq!(vec![0, 0], result.unwrap());
 
-        result = n.add_cargo_under(&vec![0], 4);
+        result = n.add_cargo_under_path(&vec![0], 4);
         assert!(result.is_ok());
         assert_eq!(vec![0, 1], result.unwrap());
 
@@ -1686,11 +1741,11 @@ mod tests {
         assert!(borrowed.is_ok());
         assert_eq!(&4, borrowed.unwrap());
 
-        result = n.add_cargo_under(&vec![50], 99);
+        result = n.add_cargo_under_path(&vec![50], 99);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
 
-        result = n.add_cargo_under(&vec![0, 1, 1], 99);
+        result = n.add_cargo_under_path(&vec![0, 1, 1], 99);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFound,99), result.unwrap_err());
     }
@@ -1700,30 +1755,30 @@ mod tests {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, i8)>;
 
-        result = n.add_cargo_after(&vec![], -38);
+        result = n.add_cargo_after_path(&vec![], -38);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFitForOperation, -38), result.unwrap_err());
     }
 
     #[test]
-    fn node_add_cargo_after() {
+    fn node_add_cargo_after_path() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, i8)>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_cargo_after(&vec![0], 1);
+        result = n.add_cargo_after_path(&vec![0], 1);
         assert!(result.is_err());
         assert_eq!((PathError::RequestedPathNotAvailable, 1), result.unwrap_err());
 
-        n.add_cargo_under(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
 
-        result = n.add_cargo_after(&vec![0], 2);
+        result = n.add_cargo_after_path(&vec![0], 2);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
         assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_cargo_after(&vec![0], 3);
+        result = n.add_cargo_after_path(&vec![0], 3);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
@@ -1736,44 +1791,44 @@ mod tests {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, i8)>;
 
-        result = n.add_cargo_before(&vec![], -38);
+        result = n.add_cargo_before_path(&vec![], -38);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFitForOperation,-38), result.unwrap_err());
     }
 
     #[test]
-    fn node_add_cargo_before() {
+    fn node_add_cargo_before_path() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, i8)>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_cargo_before(&vec![0], 1);
+        result = n.add_cargo_before_path(&vec![0], 1);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
         assert_eq!(&1, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_cargo_before(&vec![0], 2);
+        result = n.add_cargo_before_path(&vec![0], 2);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
         assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
         assert_eq!(&1, n.borrow_cargo(&vec![1]).unwrap());
 
-        result = n.add_cargo_before(&vec![1], 3);
+        result = n.add_cargo_before_path(&vec![1], 3);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
         assert_eq!(&3, n.borrow_cargo(&result_path).unwrap());
         assert_eq!(&1, n.borrow_cargo(&vec![2]).unwrap());
 
-        result = n.add_cargo_before(&vec![0, 0], 4);
+        result = n.add_cargo_before_path(&vec![0, 0], 4);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0, 0], result_path);
         assert_eq!(&4, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_cargo_before(&vec![2, 1], 5);
+        result = n.add_cargo_before_path(&vec![2, 1], 5);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFound,5), result.unwrap_err());
     }
@@ -1793,8 +1848,8 @@ mod tests {
     #[test]
     fn node_get_next_from_last() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
         assert_eq!(Err(PathError::RequestedPathNotAvailable), n.get_next_path(&vec![1]));
     }
 
@@ -1802,8 +1857,8 @@ mod tests {
     #[should_panic]
     fn node_get_next_from_last_unwrap() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
         let path_result = n.get_next_path(&vec![1]);
         path_result.unwrap();
     }
@@ -1811,8 +1866,8 @@ mod tests {
     #[test]
     fn node_get_next_next_sibling() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
 
         let path_result = n.get_next_path(&vec![0]);
         assert!(path_result.is_ok());
@@ -1824,59 +1879,59 @@ mod tests {
     #[test]
     fn node_get_next_root_to_child() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
         assert_eq!(Ok(vec![0]), n.get_next_path(&vec![]));
     }
 
     #[test]
     fn node_get_next_non_root_to_child() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_after(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_after_path(&vec![1], 4).unwrap();
         assert_eq!(Ok(vec![1, 0]), n.get_next_path(&vec![1]));
     }
 
     #[test]
     fn node_get_next_non_child_to_parents_sibling() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_after(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_after_path(&vec![1], 4).unwrap();
         assert_eq!(Ok(vec![2]), n.get_next_path(&vec![1, 0]));
     }
 
     #[test]
     fn node_get_next_non_child_to_grandparents_sibling() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1, 0], 4).unwrap();
-        n.add_cargo_after(&vec![1], 5).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
+        n.add_cargo_after_path(&vec![1], 5).unwrap();
         assert_eq!(Ok(vec![2]), n.get_next_path(&vec![1, 0, 0]));
     }
 
     #[test]
     fn node_get_next_from_last_is_grandchild() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1, 0], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
         assert_eq!(Err(PathError::RequestedPathNotAvailable), n.get_next_path(&vec![1, 0, 0]));
     }
 
     #[test]
     fn node_get_previous_from_unexistent() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1, 0], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
         assert_eq!(Err(PathError::InputPathNotFound), n.get_next_path(&vec![3, 0, 0]));
     }
 
@@ -1889,15 +1944,15 @@ mod tests {
     #[test]
     fn node_get_previous() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_after(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1, 0], 4).unwrap();
-        n.add_cargo_after(&vec![1], 5).unwrap();
-        n.add_cargo_after(&vec![2], 6).unwrap();
-        n.add_cargo_after(&vec![1, 0], 50).unwrap();
-        n.add_cargo_under(&vec![1, 1], 51).unwrap();
-        n.add_cargo_after(&vec![1, 1, 0], 52).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_after_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1, 0], 4).unwrap();
+        n.add_cargo_after_path(&vec![1], 5).unwrap();
+        n.add_cargo_after_path(&vec![2], 6).unwrap();
+        n.add_cargo_after_path(&vec![1, 0], 50).unwrap();
+        n.add_cargo_under_path(&vec![1, 1], 51).unwrap();
+        n.add_cargo_after_path(&vec![1, 1, 0], 52).unwrap();
 
         /*
          *  0
@@ -1965,7 +2020,7 @@ mod tests {
     #[test]
     fn node_get_last_on_lone_child() {
         let mut n = Node::new('K');
-        n.add_cargo_under(&vec![], 'Z').unwrap();
+        n.add_cargo_under_path(&vec![], 'Z').unwrap();
         let result = n.get_last_path();
         assert_eq!(vec![0usize], result);
     }
@@ -1973,9 +2028,9 @@ mod tests {
     #[test]
     fn node_get_last_on_first_level() {
         let mut n = Node::new('A');
-        n.add_cargo_under(&vec![], 'B').unwrap();
-        n.add_cargo_under(&vec![], 'C').unwrap();
-        n.add_cargo_under(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
         let result = n.get_last_path();
         assert_eq!(vec![2usize], result);
         assert_eq!(&'D', n.borrow_cargo(&vec![2]).unwrap());
@@ -1984,7 +2039,7 @@ mod tests {
     #[test]
     fn node_extract_node_by_root() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&n.get_first_path(), 1).unwrap();
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&n.get_first_path());
         assert!(result.is_err());
         assert_eq!(PathError::InputPathNotFitForOperation, result.unwrap_err());
@@ -1993,7 +2048,7 @@ mod tests {
     #[test]
     fn node_extract_node_by_nonexistent() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&n.get_first_path(), 1).unwrap();
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&vec![0, 3]);
         assert!(result.is_err());
         assert_eq!(PathError::InputPathNotFound, result.unwrap_err());
@@ -2002,7 +2057,7 @@ mod tests {
     #[test]
     fn node_extract_node_by_lone_leaf() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&n.get_first_path(), 1).unwrap();
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
         let result = n.extract_node(&vec![0]);
         assert!(result.is_ok());
         let nd = result.unwrap();
@@ -2012,9 +2067,9 @@ mod tests {
     #[test]
     fn node_extract_node_by_lone_non_leaf() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&n.get_first_path(), 1).unwrap();
-        n.add_cargo_under(&vec![0], 2).unwrap();
-        n.add_cargo_under(&vec![0], 3).unwrap();
+        n.add_cargo_under_path(&n.get_first_path(), 1).unwrap();
+        n.add_cargo_under_path(&vec![0], 2).unwrap();
+        n.add_cargo_under_path(&vec![0], 3).unwrap();
         let result = n.extract_node(&vec![0]);
         assert!(result.is_ok());
         let nd = result.unwrap();
@@ -2025,11 +2080,11 @@ mod tests {
     #[test]
     fn node_extract_node_by_non_leaf() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 90).unwrap();
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_under(&vec![], 91).unwrap();
-        n.add_cargo_under(&vec![1], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![], 90).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 91).unwrap();
+        n.add_cargo_under_path(&vec![1], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
         let result = n.extract_node(&vec![1]);
         assert!(result.is_ok());
         let nd = result.unwrap();
@@ -2045,7 +2100,7 @@ mod tests {
         let n1 = Node::new(1u8);
         let result: Result<Vec<usize>, (PathError, Node<u8>)>;
 
-        result = n.add_node_under(&vec![2, 4], n1);
+        result = n.add_node_under_path(&vec![2, 4], n1);
         assert!(result.is_err());
         let (err, bounced_node) = result.unwrap_err();
         assert_eq!(PathError::InputPathNotFound, err);
@@ -2053,13 +2108,13 @@ mod tests {
     }
 
     #[test]
-    fn node_add_node_under() {
+    fn node_add_node_under_path() {
         let mut n = Node::new(0u8);
         let n1 = Node::new(1u8);
         let result: Result<Vec<usize>, (PathError, Node<u8>)>;
         let result_path: Vec<usize>;
 
-        result = n.add_node_under(&vec![], n1);
+        result = n.add_node_under_path(&vec![], n1);
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
@@ -2072,33 +2127,33 @@ mod tests {
         let n1 = Node::new(-38i8);
         let result: Result<Vec<usize>, (PathError, Node<i8>)>;
 
-        result = n.add_node_after(&vec![], n1);
+        result = n.add_node_after_path(&vec![], n1);
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFitForOperation, Node::new(-38i8)), result.unwrap_err());
     }
 
     #[test]
-    fn node_add_node_after() {
+    fn node_add_node_after_path() {
         let mut n = Node::new(0i8);
         let n1 = Node::new(1i8);
         let mut result: Result<Vec<usize>, (PathError, Node<i8>)>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_node_after(&vec![0], n1);
+        result = n.add_node_after_path(&vec![0], n1);
         assert!(result.is_err());
         let (err, bounced_node) = result.unwrap_err();
         assert_eq!(PathError::RequestedPathNotAvailable, err);
         assert_eq!(Node::new(1i8), bounced_node);
 
-        n.add_node_under(&vec![], bounced_node).unwrap();
+        n.add_node_under_path(&vec![], bounced_node).unwrap();
 
-        result = n.add_node_after(&vec![0], Node::new(2i8));
+        result = n.add_node_after_path(&vec![0], Node::new(2i8));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
         assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_node_after(&vec![0], Node::new(3));
+        result = n.add_node_after_path(&vec![0], Node::new(3));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
@@ -2111,44 +2166,44 @@ mod tests {
         let mut n = Node::new(0i8);
         let result: Result<Vec<usize>, (PathError, Node<i8>)>;
 
-        result = n.add_node_before(&vec![], Node::new(-38));
+        result = n.add_node_before_path(&vec![], Node::new(-38));
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFitForOperation, Node::new(-38)), result.unwrap_err());
     }
 
     #[test]
-    fn node_add_node_before() {
+    fn node_add_node_before_path() {
         let mut n = Node::new(0i8);
         let mut result: Result<Vec<usize>, (PathError, Node<i8>)>;
         let mut result_path: Vec<usize>;
 
-        result = n.add_node_before(&vec![0], Node::new(1));
+        result = n.add_node_before_path(&vec![0], Node::new(1));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
         assert_eq!(&1, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_node_before(&vec![0], Node::new(2));
+        result = n.add_node_before_path(&vec![0], Node::new(2));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0], result_path);
         assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
         assert_eq!(&1, n.borrow_cargo(&vec![1]).unwrap());
 
-        result = n.add_node_before(&vec![1], Node::new(3));
+        result = n.add_node_before_path(&vec![1], Node::new(3));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![1], result_path);
         assert_eq!(&3, n.borrow_cargo(&result_path).unwrap());
         assert_eq!(&1, n.borrow_cargo(&vec![2]).unwrap());
 
-        result = n.add_node_before(&vec![0, 0], Node::new(4));
+        result = n.add_node_before_path(&vec![0, 0], Node::new(4));
         assert!(result.is_ok());
         result_path = result.unwrap();
         assert_eq!(vec![0, 0], result_path);
         assert_eq!(&4, n.borrow_cargo(&result_path).unwrap());
 
-        result = n.add_node_before(&vec![2, 1], Node::new(5));
+        result = n.add_node_before_path(&vec![2, 1], Node::new(5));
         assert!(result.is_err());
         assert_eq!((PathError::InputPathNotFound, Node::new(5)), result.unwrap_err());
     }
@@ -2178,18 +2233,18 @@ mod tests {
     #[test]
     fn node_swap_node() {
         let mut n = Node::new(0u8);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_under(&vec![], 2).unwrap();
-        n.add_cargo_under(&vec![], 3).unwrap();
-        n.add_cargo_under(&vec![1], 20).unwrap();
-        n.add_cargo_under(&vec![1], 21).unwrap();
-        n.add_cargo_under(&vec![1], 22).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 20).unwrap();
+        n.add_cargo_under_path(&vec![1], 21).unwrap();
+        n.add_cargo_under_path(&vec![1], 22).unwrap();
 
         let mut to_swap = Node::new(9u8);
-        to_swap.add_cargo_under(&vec![], 90).unwrap();
-        to_swap.add_cargo_under(&vec![], 91).unwrap();
-        to_swap.add_cargo_under(&vec![], 92).unwrap();
-        to_swap.add_cargo_under(&vec![], 93).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 90).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 91).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 92).unwrap();
+        to_swap.add_cargo_under_path(&vec![], 93).unwrap();
 
         let result = n.swap_node(&vec![1], to_swap);
         assert!(result.is_ok());
@@ -2237,13 +2292,13 @@ mod tests {
     #[test]
     fn node_iter() {
         let mut n = Node::new('A');
-        n.add_cargo_under(&vec![], 'B').unwrap();
-        n.add_cargo_under(&vec![], 'C').unwrap();
-        n.add_cargo_under(&vec![], 'D').unwrap();
-        n.add_cargo_under(&vec![2], 'E').unwrap();
-        n.add_cargo_under(&vec![2], 'F').unwrap();
-        n.add_cargo_under(&vec![2, 1], 'G').unwrap();
-        n.add_cargo_under(&vec![], 'H').unwrap();
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
 
         let concat = n.iter().fold(
             String::new(),
@@ -2259,13 +2314,13 @@ mod tests {
     #[test]
     fn node_iter_back() {
         let mut n = Node::new('A');
-        n.add_cargo_under(&vec![], 'B').unwrap();
-        n.add_cargo_under(&vec![], 'C').unwrap();
-        n.add_cargo_under(&vec![], 'D').unwrap();
-        n.add_cargo_under(&vec![2], 'E').unwrap();
-        n.add_cargo_under(&vec![2], 'F').unwrap();
-        n.add_cargo_under(&vec![2, 1], 'G').unwrap();
-        n.add_cargo_under(&vec![], 'H').unwrap();
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
 
         let concat = n.iter().rfold(
             String::new(),
@@ -2281,13 +2336,13 @@ mod tests {
     #[test]
     fn node_iter_next_back_dont_cross() {
         let mut n = Node::new('A');
-        n.add_cargo_under(&vec![], 'B').unwrap();
-        n.add_cargo_under(&vec![], 'C').unwrap();
-        n.add_cargo_under(&vec![], 'D').unwrap();
-        n.add_cargo_under(&vec![2], 'E').unwrap();
-        n.add_cargo_under(&vec![2], 'F').unwrap();
-        n.add_cargo_under(&vec![2, 1], 'G').unwrap();
-        n.add_cargo_under(&vec![], 'H').unwrap();
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
 
         let mut concat = String::new();
         let mut iter = n.iter();
@@ -2320,13 +2375,13 @@ mod tests {
     #[test]
     fn node_iter_back_next_dont_cross() {
         let mut n = Node::new('A');
-        n.add_cargo_under(&vec![], 'B').unwrap();
-        n.add_cargo_under(&vec![], 'C').unwrap();
-        n.add_cargo_under(&vec![], 'D').unwrap();
-        n.add_cargo_under(&vec![2], 'E').unwrap();
-        n.add_cargo_under(&vec![2], 'F').unwrap();
-        n.add_cargo_under(&vec![2, 1], 'G').unwrap();
-        n.add_cargo_under(&vec![], 'H').unwrap();
+        n.add_cargo_under_path(&vec![], 'B').unwrap();
+        n.add_cargo_under_path(&vec![], 'C').unwrap();
+        n.add_cargo_under_path(&vec![], 'D').unwrap();
+        n.add_cargo_under_path(&vec![2], 'E').unwrap();
+        n.add_cargo_under_path(&vec![2], 'F').unwrap();
+        n.add_cargo_under_path(&vec![2, 1], 'G').unwrap();
+        n.add_cargo_under_path(&vec![], 'H').unwrap();
 
         let mut concat = String::new();
         let mut iter = n.iter();
@@ -2374,11 +2429,11 @@ mod tests {
     #[test]
     fn node_traverse_and_change() {
         let mut n = Node::new(0);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_under(&vec![], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1], 4).unwrap();
-        n.add_cargo_under(&vec![], 5).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 5).unwrap();
 
         let mut outcome = n.traverse(
             0,
@@ -2408,11 +2463,11 @@ mod tests {
     #[test]
     fn node_traverse_back_and_change() {
         let mut n = Node::new(0);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_under(&vec![], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1], 4).unwrap();
-        n.add_cargo_under(&vec![], 5).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 5).unwrap();
 
         let mut outcome = n.traverse_back(
             0,
@@ -2442,11 +2497,11 @@ mod tests {
     #[test]
     fn node_traverse_break() {
         let mut n = Node::new(0);
-        n.add_cargo_under(&vec![], 1).unwrap();
-        n.add_cargo_under(&vec![], 2).unwrap();
-        n.add_cargo_under(&vec![1], 3).unwrap();
-        n.add_cargo_under(&vec![1], 4).unwrap();
-        n.add_cargo_under(&vec![], 5).unwrap();
+        n.add_cargo_under_path(&vec![], 1).unwrap();
+        n.add_cargo_under_path(&vec![], 2).unwrap();
+        n.add_cargo_under_path(&vec![1], 3).unwrap();
+        n.add_cargo_under_path(&vec![1], 4).unwrap();
+        n.add_cargo_under_path(&vec![], 5).unwrap();
 
         let outcome = n.traverse(
             0,
@@ -2482,21 +2537,21 @@ mod tests {
         let root_path = n.get_first_path();
         let deeper_path: Vec<usize>;
 
-        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1).unwrap();
-        n.add_cargo_under(&root_child_path, 2).unwrap();
-        n.add_cargo_under(&root_child_path, 3).unwrap();
+        let mut root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 1).unwrap();
+        n.add_cargo_under_path(&root_child_path, 2).unwrap();
+        n.add_cargo_under_path(&root_child_path, 3).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 100).unwrap();
-        n.add_cargo_under(&root_child_path, 4).unwrap();
-        n.add_cargo_under(&root_child_path, 5).unwrap();
-        deeper_path = n.add_cargo_under(&root_child_path, 6).unwrap();
-        n.add_cargo_under(&deeper_path, 50).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 100).unwrap();
+        n.add_cargo_under_path(&root_child_path, 4).unwrap();
+        n.add_cargo_under_path(&root_child_path, 5).unwrap();
+        deeper_path = n.add_cargo_under_path(&root_child_path, 6).unwrap();
+        n.add_cargo_under_path(&deeper_path, 50).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7).unwrap();
-        n.add_cargo_under(&root_child_path, 8).unwrap();
-        n.add_cargo_under(&root_child_path, 9).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 7).unwrap();
+        n.add_cargo_under_path(&root_child_path, 8).unwrap();
+        n.add_cargo_under_path(&root_child_path, 9).unwrap();
 
         let sum = n.traverse(
             0,
@@ -2518,20 +2573,20 @@ mod tests {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
 
-        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1).unwrap();
-        n.add_cargo_under(&root_child_path, 2).unwrap();
-        n.add_cargo_under(&root_child_path, 3).unwrap();
+        let mut root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 1).unwrap();
+        n.add_cargo_under_path(&root_child_path, 2).unwrap();
+        n.add_cargo_under_path(&root_child_path, 3).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 4).unwrap();
-        n.add_cargo_under(&root_child_path, 5).unwrap();
-        n.add_cargo_under(&root_child_path, 6).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 4).unwrap();
+        n.add_cargo_under_path(&root_child_path, 5).unwrap();
+        n.add_cargo_under_path(&root_child_path, 6).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7).unwrap();
-        n.add_cargo_under(&root_child_path, 8).unwrap();
-        n.add_cargo_under(&root_child_path, 9).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 7).unwrap();
+        n.add_cargo_under_path(&root_child_path, 8).unwrap();
+        n.add_cargo_under_path(&root_child_path, 9).unwrap();
 
         let sum = n.traverse_back(
             0,
@@ -2553,20 +2608,20 @@ mod tests {
         let mut n = Node::new(0);   
         let root_path = n.get_first_path();
 
-        let mut root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 1).unwrap();
-        n.add_cargo_under(&root_child_path, 2).unwrap();
-        n.add_cargo_under(&root_child_path, 3).unwrap();
+        let mut root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 1).unwrap();
+        n.add_cargo_under_path(&root_child_path, 2).unwrap();
+        n.add_cargo_under_path(&root_child_path, 3).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 4).unwrap();
-        n.add_cargo_under(&root_child_path, 5).unwrap();
-        n.add_cargo_under(&root_child_path, 6).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 4).unwrap();
+        n.add_cargo_under_path(&root_child_path, 5).unwrap();
+        n.add_cargo_under_path(&root_child_path, 6).unwrap();
 
-        root_child_path = n.add_cargo_under(&root_path, 0).unwrap();
-        n.add_cargo_under(&root_child_path, 7).unwrap();
-        n.add_cargo_under(&root_child_path, 8).unwrap();
-        n.add_cargo_under(&root_child_path, 9).unwrap();
+        root_child_path = n.add_cargo_under_path(&root_path, 0).unwrap();
+        n.add_cargo_under_path(&root_child_path, 7).unwrap();
+        n.add_cargo_under_path(&root_child_path, 8).unwrap();
+        n.add_cargo_under_path(&root_child_path, 9).unwrap();
 
         let sum = n.traverse_back(
             0,
@@ -2602,8 +2657,8 @@ mod tests {
     #[test]
     fn node_set_cargo_on_root() {
         let mut n = Node::new('a');
-        n.add_cargo_under(&vec![], 'b').unwrap();
-        n.add_cargo_under(&vec![], 'c').unwrap();
+        n.add_cargo_under_path(&vec![], 'b').unwrap();
+        n.add_cargo_under_path(&vec![], 'c').unwrap();
 
         let result = n.set_cargo(&vec![], 'z');
         assert!(result.is_ok());
@@ -2613,8 +2668,8 @@ mod tests {
     #[test]
     fn node_set_cargo_wrong_path() {
         let mut n = Node::new('a');
-        n.add_cargo_under(&vec![], 'b').unwrap();
-        n.add_cargo_under(&vec![], 'c').unwrap();
+        n.add_cargo_under_path(&vec![], 'b').unwrap();
+        n.add_cargo_under_path(&vec![], 'c').unwrap();
 
         let result = n.set_cargo(&vec![1, 3], 'z');
         assert!(result.is_err());
@@ -2624,8 +2679,8 @@ mod tests {
     #[test]
     fn node_set_cargo() {
         let mut n = Node::new('a');
-        n.add_cargo_under(&vec![], 'b').unwrap();
-        n.add_cargo_under(&vec![], 'c').unwrap();
+        n.add_cargo_under_path(&vec![], 'b').unwrap();
+        n.add_cargo_under_path(&vec![], 'c').unwrap();
 
         let result = n.set_cargo(&vec![1], 'z');
         assert!(result.is_ok());
@@ -2643,10 +2698,10 @@ mod tests {
 
         for crg in 0usize..total_nodes {
             if siblings_count < total_siblings {
-                n.add_cargo_under(&path, crg).unwrap();
+                n.add_cargo_under_path(&path, crg).unwrap();
                 siblings_count += 1;
             } else {
-                path = n.add_cargo_under(&path, crg).unwrap();
+                path = n.add_cargo_under_path(&path, crg).unwrap();
                 siblings_count = 1;
             }
         }
@@ -2676,11 +2731,11 @@ mod tests {
         let mut path: Vec<usize> = Vec::new();
 
         for i in 1u8..4 {
-            path = n.add_cargo_under(&vec![], i).unwrap();
+            path = n.add_cargo_under_path(&vec![], i).unwrap();
         }
 
         for i in 4u8..7 {
-            n.add_cargo_under(&path, i).unwrap();
+            n.add_cargo_under_path(&path, i).unwrap();
         }
 
         let orig_total = n.traverse(
@@ -2747,7 +2802,7 @@ mod tests {
         struct NoClone {}
 
         let mut n = Node::new(NoClone{});
-        n.add_cargo_under(&Vec::<usize>::new(), NoClone{}).unwrap();
+        n.add_cargo_under_path(&Vec::<usize>::new(), NoClone{}).unwrap();
 
         // The below statement doesn't even compile, quod erat demonstrandum :
         // error[E0599]: the method `clone` exists for struct `Node<NoClone>`, but its trait bounds were not satisfied
@@ -2761,14 +2816,14 @@ mod tests {
         let root_path = n.get_first_path();
 
         for i in 1u8..4 {
-            n.add_cargo_under(&root_path, i).unwrap();
+            n.add_cargo_under_path(&root_path, i).unwrap();
         }
 
         n.traverse(
             0u8,
             |_accum, nd, _path| {
                 if nd.cargo == 2 {
-                    nd.add_cargo_under(&root_path, 4u8).unwrap();
+                    nd.add_cargo_under_path(&root_path, 4u8).unwrap();
                 }
                 TraverseAction::Continue
             }
@@ -2786,11 +2841,11 @@ mod tests {
         }
 
         let mut n = Node::new(NoCopy{value: 10});
-        let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
-        n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+        let added_path = n.add_cargo_under_path(&vec![], NoCopy{value: 1}).unwrap();
+        n.add_cargo_under_path(&vec![], NoCopy{value: 7}).unwrap();
 
-        n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
-        n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+        n.add_cargo_under_path(&added_path, NoCopy{value: 2}).unwrap();
+        n.add_cargo_under_path(&added_path, NoCopy{value: 3}).unwrap();
 
         let mut total = n.traverse(
             0u8,
@@ -2829,11 +2884,11 @@ mod tests {
         }
 
         let mut n = Node::new(NoCopy{value: 10});
-        let added_path = n.add_cargo_under(&vec![], NoCopy{value: 1}).unwrap();
-        n.add_cargo_under(&vec![], NoCopy{value: 7}).unwrap();
+        let added_path = n.add_cargo_under_path(&vec![], NoCopy{value: 1}).unwrap();
+        n.add_cargo_under_path(&vec![], NoCopy{value: 7}).unwrap();
 
-        n.add_cargo_under(&added_path, NoCopy{value: 2}).unwrap();
-        n.add_cargo_under(&added_path, NoCopy{value: 3}).unwrap();
+        n.add_cargo_under_path(&added_path, NoCopy{value: 2}).unwrap();
+        n.add_cargo_under_path(&added_path, NoCopy{value: 3}).unwrap();
 
         let mut total = n.traverse(
             0u8,
@@ -2866,7 +2921,7 @@ mod tests {
     #[test]
     fn node_swap_cargo_wrong_path() {
         let mut n = Node::new('g');
-        n.add_cargo_under(&vec![], 'o').unwrap();
+        n.add_cargo_under_path(&vec![], 'o').unwrap();
 
         let result = Node::swap_cargo(n, &vec![5], 'a');
         assert!(result.is_err());
@@ -2919,12 +2974,12 @@ mod tests {
     }
 
     #[test]
-    fn node_with_id_add_cargo_under_with_id() {
+    fn node_with_id_add_cargo_under_path_with_id() {
         let mut n = Node::new_with_id(0u8);
         let id: usize;
         let path: Vec<usize>;
 
-        let result = n.add_cargo_under_with_id(&vec![], 1);
+        let result = n.add_cargo_under_path_with_id(&vec![], 1);
         assert!(result.is_ok());
 
         (path, id) = result.unwrap();
@@ -2939,7 +2994,7 @@ mod tests {
         let mut n = Node::new_with_id(0u8);
         let crg: u8;
 
-        let result = n.add_cargo_under_with_id(&vec![4, 7], 1u8);
+        let result = n.add_cargo_under_path_with_id(&vec![4, 7], 1u8);
         assert!(result.is_err());
 
         (_, crg) = result.unwrap_err();
@@ -2947,13 +3002,13 @@ mod tests {
     }
 
     #[test]
-    fn node_with_id_add_cargo_after_with_id() {
+    fn node_with_id_add_cargo_after_path_with_id() {
         let mut n = Node::new_with_id(0u8);
         let id: usize;
         let path: Vec<usize>;
 
-        n.add_cargo_under_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_after_with_id(&vec![0], 2);
+        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_after_path_with_id(&vec![0], 2);
 
         (path, id) = result.unwrap();
         assert_eq!(vec![1], path);
@@ -2967,8 +3022,8 @@ mod tests {
         let mut n = Node::new_with_id(0u8);
         let crg: u8;
 
-        n.add_cargo_under_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_after_with_id(&vec![4], 2u8);
+        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_after_path_with_id(&vec![4], 2u8);
         assert!(result.is_err());
 
         (_, crg) = result.unwrap_err();
@@ -2976,13 +3031,13 @@ mod tests {
     }
 
     #[test]
-    fn node_with_id_add_cargo_before_with_id() {
+    fn node_with_id_add_cargo_before_path_with_id() {
         let mut n = Node::new_with_id(0u8);
         let id: usize;
         let path: Vec<usize>;
 
-        n.add_cargo_under_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_before_with_id(&vec![0], 2);
+        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_before_path_with_id(&vec![0], 2);
 
         (path, id) = result.unwrap();
         assert_eq!(vec![0], path);
@@ -2996,8 +3051,8 @@ mod tests {
         let mut n = Node::new_with_id(0u8);
         let crg: u8;
 
-        n.add_cargo_under_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_before_with_id(&vec![4], 2u8);
+        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
+        let result = n.add_cargo_before_path_with_id(&vec![4], 2u8);
         assert!(result.is_err());
 
         (_, crg) = result.unwrap_err();
@@ -3005,14 +3060,14 @@ mod tests {
     }
 
     #[test]
-    fn node_with_id_borrow_cargo_get_path_by_id() {
+    fn node_with_id_borrow_cargo_and_get_path_by_id() {
         let mut n = Node::new_with_id(10);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
-        let result = n.borrow_cargo_get_path_by_id(&new_id);
+        let result = n.borrow_cargo_and_get_path_by_id(&new_id);
         assert!(result.is_ok());
 
         let (&found_cargo, found_path) = result.unwrap();
@@ -3024,25 +3079,25 @@ mod tests {
     fn node_with_id_borrow_cargo_get_path_by_wrong_id() {
         let mut n = Node::new_with_id(10);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
-        let result = n.borrow_cargo_get_path_by_id(&(new_id + 20));
+        let result = n.borrow_cargo_and_get_path_by_id(&(new_id + 20));
         assert!(result.is_err());
         assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
     }
 
     #[test]
-    fn node_with_id_borrow_mut_cargo_get_path_by_id() {
+    fn node_with_id_borrow_mut_cargo_and_get_path_by_id() {
         let mut n = Node::new_with_id(10u8);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
         {
-            let result = n.borrow_mut_cargo_get_path_by_id(&new_id);
+            let result = n.borrow_mut_cargo_and_get_path_by_id(&new_id);
             assert!(result.is_ok());
 
             let (found_cargo, found_path) = result.unwrap();
@@ -3052,7 +3107,7 @@ mod tests {
             *found_cargo = 100u8;
         }
 
-        let result2 = n.borrow_cargo_get_path_by_id(&new_id);
+        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
         assert!(result2.is_ok());
         let (found_cargo2, found_path2) = result2.unwrap();
         assert_eq!(&100u8, found_cargo2);
@@ -3063,11 +3118,11 @@ mod tests {
     fn node_with_id_borrow_mut_cargo_get_path_by_wrong_id() {
         let mut n = Node::new_with_id(10u8);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
-        let result = n.borrow_mut_cargo_get_path_by_id(&(new_id + 10));
+        let result = n.borrow_mut_cargo_and_get_path_by_id(&(new_id + 10));
         assert!(result.is_err());
         assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
     }
@@ -3076,9 +3131,9 @@ mod tests {
     fn node_with_id_borrow_cargo_by_id() {
         let mut n = Node::new_with_id(10);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
         let result = n.borrow_cargo_by_id(&new_id);
         assert!(result.is_ok());
@@ -3091,9 +3146,9 @@ mod tests {
     fn node_with_id_borrow_mut_cargo_by_id() {
         let mut n = Node::new_with_id(10u8);
         let root_path = vec![];
-        n.add_cargo_under_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_with_id(&vec![1], 13).unwrap().1;
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
 
         {
             let result = n.borrow_mut_cargo_by_id(&new_id);
@@ -3108,6 +3163,88 @@ mod tests {
         let result2 = n.borrow_cargo_by_id(&new_id);
         assert!(result2.is_ok());
         assert_eq!(&200u8, result2.unwrap());
+    }
+
+    #[test]
+    fn node_with_id_borrow_node_and_get_path_by_id() {
+        let mut n = Node::new_with_id(10);
+        let root_path = vec![];
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_node_and_get_path_by_id(&new_id);
+        assert!(result.is_ok());
+
+        let (found_node, found_path) = result.unwrap();
+        assert_eq!(13, found_node.cargo.subcargo);
+        assert_eq!(vec![1, 0], found_path);
+    }
+
+    #[test]
+    fn node_with_id_borrow_mut_node_and_get_path_by_id() {
+        let mut n = Node::new_with_id(10u8);
+        let root_path = vec![];
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
+
+        {
+            let result = n.borrow_mut_node_and_get_path_by_id(&new_id);
+            assert!(result.is_ok());
+
+            let (found_node, found_path) = result.unwrap();
+            assert_eq!(13, found_node.cargo.subcargo);
+            assert_eq!(vec![1, 0], found_path);
+
+            found_node.cargo.subcargo = 100u8;
+        }
+
+        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
+        assert!(result2.is_ok());
+        let (found_cargo2, found_path2) = result2.unwrap();
+        assert_eq!(&100u8, found_cargo2);
+        assert_eq!(vec![1, 0], found_path2);
+    }
+
+    #[test]
+    fn node_with_id_borrow_node_by_id() {
+        let mut n = Node::new_with_id(10);
+        let root_path = vec![];
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
+
+        let result = n.borrow_node_by_id(&new_id);
+        assert!(result.is_ok());
+
+        let found_node = result.unwrap();
+        assert_eq!(13, found_node.cargo.subcargo);
+    }
+
+    #[test]
+    fn node_with_id_borrow_mut_node_by_id() {
+        let mut n = Node::new_with_id(10u8);
+        let root_path = vec![];
+        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
+        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
+        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
+
+        {
+            let result = n.borrow_mut_node_by_id(&new_id);
+            assert!(result.is_ok());
+
+            let found_node = result.unwrap();
+            assert_eq!(13, found_node.cargo.subcargo);
+
+            found_node.cargo.subcargo = 100u8;
+        }
+
+        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
+        assert!(result2.is_ok());
+        let (found_cargo2, found_path2) = result2.unwrap();
+        assert_eq!(&100u8, found_cargo2);
+        assert_eq!(vec![1, 0], found_path2);
     }
 
     // Testing some assumptions about vector comparisons.
