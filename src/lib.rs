@@ -1,12 +1,3 @@
-//{ TODOs
-// TODO : add methods add_cargo_after_id, add_cargo_before_id
-// TODO : add methods add_node_under_id, add_node_after_id, add_node_before_id
-// TODO : add method extract_node_by_id
-// TODO : add method has_id
-// TODO : add method set_cargo_by_id
-// TODO : Complete documentation about id-related structs and methods.
-//}
-
 //{ Documentation
 //! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
 //! who in turn may or may not have other `Node<C>` children etc.
@@ -59,7 +50,151 @@
 //! So, instead of references to nodes, instances of `Vec<usize>` paths can be kept in variables.
 //!
 //! And even if these path addresses can become obsolete after insertion or removal of nodes,
-//! specific nodes can be retrieved by lookups using the `traverse*` methods if needed.
+//! specific nodes can be retrieved by lookups on the nodes' cargo using the `traverse*` methods if needed.
+//!
+//! # Node identifiers
+//!
+//! Another way of keeping track of specific nodes could be having cargoes of a custom type that holds an
+//! identifier number or string together with other content, and looking for the nodes using one of
+//! the `traverse*` methods. E.g.:
+//!
+//! ```
+//! use tree_by_path::{Node, TraverseAction};
+//!
+//! // The custom cargo type needs an enum.
+//! #[derive(Clone, Debug)]
+//! enum HtmlPart {
+//!     Main,
+//!     Tag(String),
+//!     SimpleAttribute(String),
+//!     ValueAttribute(String, String),
+//!     Data(String),
+//! }
+//!
+//! // The custom cargo type, having an identifier property.
+//! #[derive(Clone, Debug)]
+//! struct HtmlCargo {
+//!     id: u32,
+//!     content: HtmlPart,
+//! }
+//!
+//! impl HtmlCargo {
+//!     // One could have the 'new' method automatically fill in a new id
+//!     // by increasing a static std::sync::atomic::AtomicU32.
+//!     fn new(id: u32, content: HtmlPart) -> Self {
+//!         Self { id, content, }
+//!     }
+//! }
+//!
+//! // Let's create a rough general HTML page,
+//! // thereby keeping track of the id of the page title node and the
+//! // main content section node:
+//! let mut general_page = Node::new(HtmlCargo::new(0, HtmlPart::Main));
+//! let main_path = general_page.get_first_path();
+//! let err_txt = "Adding under unknown path";
+//!
+//! let doctype_path = general_page.add_cargo_under_path(
+//!     &main_path,
+//!     HtmlCargo::new(1, HtmlPart::Tag("!doctype".to_string()))
+//! ).expect(err_txt);
+//!
+//! general_page.add_cargo_under_path(
+//!     &doctype_path,
+//!     HtmlCargo::new(2, HtmlPart::SimpleAttribute("html".to_string()))
+//! ).expect(err_txt);
+//!
+//! let html_path = general_page.add_cargo_under_path(
+//!     &main_path,
+//!     HtmlCargo::new(3, HtmlPart::Tag("html".to_string()))
+//! ).expect(err_txt);
+//!
+//! let head_path = general_page.add_cargo_under_path(
+//!     &html_path,
+//!     HtmlCargo::new(4, HtmlPart::Tag("head".to_string()))
+//! ).expect(err_txt);
+//!
+//! let title_tag_id = 5u32;
+//! let title_content_id = 6u32;
+//!
+//! let title_tag_path = general_page.add_cargo_under_path(
+//!     &head_path,
+//!     HtmlCargo::new(5, HtmlPart::Tag("title".to_string()))
+//! ).expect(err_txt);
+//!
+//! let body_path = general_page.add_cargo_under_path(
+//!     &html_path,
+//!     HtmlCargo::new(7, HtmlPart::Tag("body".to_string()))
+//! ).expect(err_txt);
+//!
+//! // Adding other things to body, like navigation, footer, etc.
+//!
+//! // Adding the tag that will contain custom parts.
+//! let custom_part_id = 8u32;
+//!
+//! general_page.add_cargo_under_path(
+//!     &body_path,
+//!     HtmlCargo::new(custom_part_id, HtmlPart::Tag("section".to_string()))
+//! ).expect(err_txt);
+//!
+//! // Let's clone the general page skeleton in order to make a custom page.
+//! let mut custom_page_welcome = general_page.clone();
+//!
+//! // Let's look for the node of the title tag by title_tag_id and add a title text if found.
+//! let title_tag_found = custom_page_welcome.traverse_mut(
+//!     false,
+//!     |is_found, node, path| {
+//!         if node.cargo.id == title_tag_id {
+//!             *is_found = true;
+//!
+//!             node.add_cargo_under_path(
+//!                 &vec![],
+//!                 HtmlCargo::new(title_content_id, HtmlPart::Data("Welcome !".to_string()))
+//!             ).expect(err_txt);
+//!
+//!             TraverseAction::Stop
+//!         } else {
+//!             TraverseAction::Continue
+//!         }
+//!     }
+//! );
+//!
+//! if !title_tag_found {
+//!     println!("Couldn't add a title to the custom page HTML tree.");
+//! }
+//!
+//! // Let's look for the node of the custom_part by custom_part_id and add content if found.
+//! let custom_part_tag_found = custom_page_welcome.traverse_mut(
+//!     false,
+//!     |is_found, node, path| {
+//!         if node.cargo.id == custom_part_id {
+//!             *is_found = true;
+//!
+//!             let mut last_path = node.add_cargo_under_path(
+//!                 &vec![],
+//!                 HtmlCargo::new(1000, HtmlPart::Tag("h1".to_string()))
+//!             ).expect(err_txt);
+//!
+//!             node.add_cargo_under_path(
+//!                 &last_path,
+//!                 HtmlCargo::new(1001, HtmlPart::Data("Welcome !".to_string()))
+//!             ).expect(err_txt);
+//!
+//!             // Etcetera : adding further content.
+//!
+//!             TraverseAction::Stop
+//!         } else {
+//!             TraverseAction::Continue
+//!         }
+//!     }
+//! );
+//!
+//! if !custom_part_tag_found {
+//!     println!("Couldn't add custom content to the custom page HTML tree.");
+//! }
+//!
+//! // Using another custom_page_welcome.traverse call,
+//! // the very HTML string for the custom page could be created.
+//! ```
 //!
 //! # Cloning
 //! `Node<C>` is clonable if type `C` is clonable :
@@ -132,7 +267,8 @@
 //!
 //! assert_eq!(6i8, sum);
 //!
-//! // However, the traverse_mut method runs somewhat faster and offers mutable access to the nodes :
+//! // However, the traverse_mut method runs somewhat faster
+//! // and offers mutable access to the nodes :
 //! n.traverse_mut(
 //!     0i8,
 //!     |_acc, nd, _path| {
@@ -155,8 +291,6 @@
 //!
 //! ```
 //}
-
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 // { Documentation
 /// The easiest way to construct a Node is by using its associated function Node::new, immediately
@@ -1016,7 +1150,7 @@ impl<C> Node<C> {
     /// `traverse` receives two arguments :
     /// - an initial value for an accumulator;
     /// - a callback function or closure.
-    /// 'traverse' passes a node and all of its child nodes to this callback closure or function.
+    /// `traverse` passes a node and all of its child nodes to this callback closure or function.
     /// 
     /// The callback closure receives three parameters :
     /// - a mutable reference to the accumulated value;
@@ -1104,8 +1238,7 @@ impl<C> Node<C> {
     ///
     /// (As the accumulated value is mutable, it can be manipulated by the callback closure.)
     ///
-    /// Example : totalizing the numerical cargo of all nodes until the total reaches a certain
-    /// value:
+    /// Example : increasing the value of every node with 1:
     ///
     /// ```
     /// use tree_by_path::{Node, TraverseAction};
@@ -1182,7 +1315,7 @@ impl<C> Node<C> {
     ///     this means that a node's children are visited before their parent node,
     ///     and the root node is visited last.
     /// - `TraverseAction::SkipChildren` causes a node's parent to be visited next, and preceding
-    ///     siblins to be skipped.
+    ///     siblings to be skipped.
     //}
     pub fn traverse_back<Accum, CallBack>(&self, mut init: Accum, mut call_back: CallBack) -> Accum
     where CallBack: FnMut(&mut Accum, &Node<C>, &Vec<usize>) -> TraverseAction {
@@ -1229,7 +1362,7 @@ impl<C> Node<C> {
     ///     this means that a node's children are visited before their parent node,
     ///     and the root node is visited last.
     /// - `TraverseAction::SkipChildren` causes a node's parent to be visited next, and preceding
-    ///     siblins to be skipped.
+    ///     siblings to be skipped.
     //}
     pub fn traverse_mut_back<Accum, CallBack>(&mut self, mut init: Accum, mut call_back: CallBack) -> Accum
     where CallBack: FnMut(&mut Accum, &mut Node<C>, &Vec<usize>) -> TraverseAction {
@@ -1318,184 +1451,6 @@ impl<C> Node<C> {
     }
 }
 
-impl <C> Node<CargoWithId<C>> {
-    pub fn new_with_id(cargo: C) -> Result<Self, (PathError, C)> {
-        Ok(Node::new(CargoWithId::new(cargo)?))
-    }
-
-    pub fn get_id(&self) -> usize {
-        self.cargo.id
-    }
-
-    pub fn add_cargo_under_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
-        let cargo_with_id = CargoWithId::new(cargo)?;
-        let id = cargo_with_id.id;
-
-        match self.add_cargo_under_path(path, cargo_with_id) {
-            Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.subcargo)),
-        }
-    }
-
-    pub fn add_cargo_after_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
-        let cargo_with_id = CargoWithId::new(cargo)?;
-        let id = cargo_with_id.id;
-
-        match self.add_cargo_after_path(path, cargo_with_id) {
-            Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.subcargo)),
-        }
-    }
-
-    pub fn add_cargo_before_path_with_id(&mut self, path: &Vec<usize>, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
-        let cargo_with_id = CargoWithId::new(cargo)?;
-        let id = cargo_with_id.id;
-
-        match self.add_cargo_before_path(path, cargo_with_id) {
-            Ok(new_path) => Ok((new_path, id)),
-            Err((err, crg)) => Err((err, crg.subcargo)),
-        }
-    }
-
-    pub fn get_path_to_id(&self, id: &usize) -> Result<Vec<usize>, PathError> {
-        self.traverse(
-            Err(PathError::InputIdNotFound),
-            |path_result, nd, path| {
-                if nd.cargo.id == *id {
-                    *path_result = Ok(path.clone());
-                    TraverseAction::Stop
-                } else {
-                    TraverseAction::Continue
-                }
-            }
-        )
-    }
-
-    pub fn add_cargo_under_id(&mut self, id: &usize, cargo: C) -> Result<(Vec<usize>, usize), (PathError, C)> {
-        match self.get_path_to_id(id) {
-            Ok(pth) => self.add_cargo_under_path_with_id(&pth, cargo),
-            Err(err) => Err((err, cargo)),
-        }
-    }
-
-    pub fn borrow_cargo_and_get_path_by_id(&self, id: &usize) -> Result<(&C, Vec<usize>), PathError> {
-        let mut current_path = self.get_first_path();
-        let mut current_node: &Node<CargoWithId<C>>;
-        let mut result = Err(PathError::InputIdNotFound);
-
-        loop {
-            current_node = self.borrow_node(&current_path)
-                .expect("While traversing, borrowing a node should never yield Result::Err.");
-
-            if &current_node.cargo.id == id {
-                result = Ok((&current_node.cargo.subcargo, current_path));
-                break;
-            }
-
-            current_path = match self.get_next_path(&current_path) {
-                Ok(p) => p,
-                _ => break,
-            }
-        }
-
-        result
-    }
-
-    pub fn borrow_mut_cargo_and_get_path_by_id(&mut self, id: &usize) -> Result<(&mut C, Vec<usize>), PathError> {
-        match self.traverse(
-            Option::<Vec<usize>>::None,
-            |accum, nd, path| {
-                if nd.cargo.id == *id {
-                    *accum = Some(path.clone());
-                    TraverseAction::Stop
-                } else {
-                    TraverseAction::Continue
-                }
-            }
-        ) {
-            None => Err(PathError::InputIdNotFound),
-            Some(pth) => Ok((
-                &mut self.borrow_mut_cargo(&pth)
-                    .expect("borrow_mut_cargo_and_get_path_by_id: Looking for a previously found path shouldn't fail.")
-                    .subcargo,
-                pth
-            )),
-        }
-    }
-
-    pub fn borrow_cargo_by_id(&self, id: &usize) -> Result<&C, PathError> {
-        match self.borrow_cargo_and_get_path_by_id(id) {
-            Ok((crg, _)) => Ok(crg),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub fn borrow_mut_cargo_by_id(&mut self, id: &usize) -> Result<&mut C, PathError> {
-        match self.borrow_mut_cargo_and_get_path_by_id(id) {
-            Ok((crg, _)) => Ok(crg),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub fn borrow_node_and_get_path_by_id(&self, id: &usize) -> Result<(&Node<CargoWithId<C>>, Vec<usize>), PathError> {
-        let mut current_path = self.get_first_path();
-        let mut current_node: &Node<CargoWithId<C>>;
-        let mut result = Err(PathError::InputIdNotFound);
-
-        loop {
-            current_node = self.borrow_node(&current_path)
-                .expect("While traversing, borrowing a node should never yield Result::Err.");
-
-            if &current_node.cargo.id == id {
-                result = Ok((current_node, current_path));
-                break;
-            }
-
-            current_path = match self.get_next_path(&current_path) {
-                Ok(p) => p,
-                _ => break,
-            }
-        }
-
-        result
-    }
-
-    pub fn borrow_mut_node_and_get_path_by_id(&mut self, id: &usize) -> Result<(&mut Node<CargoWithId<C>>, Vec<usize>), PathError> {
-        match self.traverse(
-            Option::<Vec<usize>>::None,
-            |accum, nd, path| {
-                if nd.cargo.id == *id {
-                    *accum = Some(path.clone());
-                    TraverseAction::Stop
-                } else {
-                    TraverseAction::Continue
-                }
-            }
-        ) {
-            None => Err(PathError::InputIdNotFound),
-            Some(pth) => Ok((
-                self.borrow_mut_node(&pth)
-                    .expect("borrow_mut_node_and_get_path_by_id: Looking for a previously found path shouldn't fail."),
-                pth
-            )),
-        }
-    }
-
-    pub fn borrow_node_by_id(&self, id: &usize) -> Result<&Node<CargoWithId<C>>, PathError> {
-        match self.borrow_node_and_get_path_by_id(id) {
-            Ok((nd, _)) => Ok(nd),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub fn borrow_mut_node_by_id(&mut self, id: &usize) -> Result<&mut Node<CargoWithId<C>>, PathError> {
-        match self.borrow_mut_node_and_get_path_by_id(id) {
-            Ok((nd, _)) => Ok(nd),
-            Err(err) => Err(err),
-        }
-    }
-}
-
 impl<C> Clone for Node<C>
 where C: Clone {
     fn clone(&self) -> Self {
@@ -1524,64 +1479,6 @@ pub enum TraverseAction {
     Stop,
 }
 
-//{ Documentation
-/// `CargoWithId` can be used when you want to have a `usize` identifier in every node of the tree.
-///
-/// You can construct a `CargoWithId<SubcargoType>` in your own code, but the `Node::new_with_id`
-/// and `Node::add_cargo_*_id` methods will do it for you also.
-///
-/// ## Cloning
-///
-/// Note that `CargoWithId` instances are not cloneable, even if the subcargo type is.
-/// The reason for this is that the `id` property of these instances is supposed to hold a unique
-/// value, so cloning would entail the retrieval of the next available `usize` value.
-/// As new `usize`s, however, are not endlessly available, creating a clone might fail, which should
-/// lead to a panic if the<br/>
-/// `   fn clone(&self) -> Self;`<br />
-/// of `trait Clone` would be implemented instead of a<br />
-/// `   fn clone(&self) -> Result<Self, (PathError, C)>;`<br />
-/// method.
-//}
-pub struct CargoWithId<Crg> {
-    id: usize,
-    subcargo: Crg,
-}
-
-impl <Crg> CargoWithId<Crg> {
-    pub fn new(subcargo: Crg) -> Result<Self, (PathError, Crg)> {
-        match Self::get_next_id() {
-            Ok(id) => Ok(CargoWithId {
-                id: id,
-                subcargo: subcargo,
-            }),
-            Err(err) => Err((err, subcargo)),
-        }
-    }
-
-    fn get_next_id() -> Result<usize, PathError> {
-        static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-        let return_value = ID_COUNTER.load(Ordering::SeqCst);
-
-        match return_value.checked_add(1) {
-            Some(added) => {
-                ID_COUNTER.store(added, Ordering::SeqCst);
-                Ok(return_value)
-            },
-            None => Err(PathError::IdOverflow),
-        }
-    }
-}
-
-/* The clone method's signature is not as expected by the Clone trait.
-impl<Crg> Clone for CargoWithId<Crg>
-where Crg: Clone {
-    fn clone(&self) -> Result<Self, PathError> {
-        Ok(CargoWithId::new(self.subcargo.clone())?)
-    }
-}
-*/
-
 #[derive(PartialEq, Debug)]
 pub enum PathError {
     /// Means that the path passed to a Node method doesn't exist.
@@ -1594,12 +1491,6 @@ pub enum PathError {
     /// Means that the output path that would be returned by a Node method doesn't exist. E.g.:
     /// calling `Node.get_next_path(&the_path_of_the_last_node)`
     RequestedPathNotAvailable,
-
-    /// Means that the id passed to a method of a `Node<CargoWithId<C>>` wasn't found in the tree.
-    InputIdNotFound,
-
-    /// Means that no next id for another `CargoWithId` instance could be created.
-    IdOverflow,
 
     /// Means that an unforeseen error occurred. In theory, this should never happen.<br />
     /// (In theory, the difference between theory and practice is extremely small.<br />
@@ -3115,385 +3006,6 @@ mod tests {
         let (_, n, old_cargo) = result.unwrap_err();
         assert_eq!(&'g', n.borrow_cargo(&vec![]).unwrap());
         assert_eq!('a', old_cargo);
-    }
-
-    #[test]
-    fn cargo_with_id_get_next_id() {
-        let mut id: usize;
-        let mut last_id = CargoWithId::<u8>::get_next_id().unwrap();
-
-        for _ in 0usize..5 {
-            id = CargoWithId::<u8>::get_next_id().unwrap();
-            assert!(last_id < id);
-            last_id = id;
-        }
-    }
-
-    #[test]
-    fn cargo_with_id_new() {
-        let mut cwi: CargoWithId<bool>;
-        let mut last_id = CargoWithId::<u8>::get_next_id().unwrap();
-
-        for _ in 0usize..5 {
-            cwi = CargoWithId::new(true).unwrap();
-            assert!(last_id < cwi.id);
-            last_id = cwi.id;
-        }
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_under_path_with_id() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let id: usize;
-        let path: Vec<usize>;
-
-        let result = n.add_cargo_under_path_with_id(&vec![], 1);
-        assert!(result.is_ok());
-
-        (path, id) = result.unwrap();
-        assert_eq!(vec![0], path);
-        
-        let crg = n.borrow_cargo(&vec![0]).unwrap();
-        assert_eq!(crg.id, id);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_under_with_id_wrong_path() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let crg: u8;
-
-        let result = n.add_cargo_under_path_with_id(&vec![4, 7], 1u8);
-        assert!(result.is_err());
-
-        (_, crg) = result.unwrap_err();
-        assert_eq!(1u8, crg);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_after_path_with_id() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let id: usize;
-        let path: Vec<usize>;
-
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_after_path_with_id(&vec![0], 2);
-
-        (path, id) = result.unwrap();
-        assert_eq!(vec![1], path);
-        
-        let crg = n.borrow_cargo(&vec![1]).unwrap();
-        assert_eq!(crg.id, id);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_after_with_id_wrong_path() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let crg: u8;
-
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_after_path_with_id(&vec![4], 2u8);
-        assert!(result.is_err());
-
-        (_, crg) = result.unwrap_err();
-        assert_eq!(2u8, crg);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_before_path_with_id() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let id: usize;
-        let path: Vec<usize>;
-
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_before_path_with_id(&vec![0], 2);
-
-        (path, id) = result.unwrap();
-        assert_eq!(vec![0], path);
-        
-        let crg = n.borrow_cargo(&vec![0]).unwrap();
-        assert_eq!(crg.id, id);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_before_with_id_wrong_path() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        let crg: u8;
-
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        let result = n.add_cargo_before_path_with_id(&vec![4], 2u8);
-        assert!(result.is_err());
-
-        (_, crg) = result.unwrap_err();
-        assert_eq!(2u8, crg);
-    }
-
-    #[test]
-    fn node_with_id_borrow_cargo_and_get_path_by_id() {
-        let mut n = Node::new_with_id(10).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_cargo_and_get_path_by_id(&new_id);
-        assert!(result.is_ok());
-
-        let (&found_cargo, found_path) = result.unwrap();
-        assert_eq!(13, found_cargo);
-        assert_eq!(vec![1, 0], found_path);
-    }
-
-    #[test]
-    fn node_with_id_borrow_cargo_get_path_by_wrong_id() {
-        let mut n = Node::new_with_id(10).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_cargo_and_get_path_by_id(&(new_id + 20));
-        assert!(result.is_err());
-        assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
-    }
-
-    #[test]
-    fn node_with_id_borrow_mut_cargo_and_get_path_by_id() {
-        let mut n = Node::new_with_id(10u8).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        {
-            let result = n.borrow_mut_cargo_and_get_path_by_id(&new_id);
-            assert!(result.is_ok());
-
-            let (found_cargo, found_path) = result.unwrap();
-            assert_eq!(&13, found_cargo);
-            assert_eq!(vec![1, 0], found_path);
-
-            *found_cargo = 100u8;
-        }
-
-        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
-        assert!(result2.is_ok());
-        let (found_cargo2, found_path2) = result2.unwrap();
-        assert_eq!(&100u8, found_cargo2);
-        assert_eq!(vec![1, 0], found_path2);
-    }
-
-    #[test]
-    fn node_with_id_borrow_mut_cargo_get_path_by_wrong_id() {
-        let mut n = Node::new_with_id(10u8).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_mut_cargo_and_get_path_by_id(&(new_id + 10));
-        assert!(result.is_err());
-        assert_eq!(PathError::InputIdNotFound, result.unwrap_err());
-    }
-
-    #[test]
-    fn node_with_id_borrow_cargo_by_id() {
-        let mut n = Node::new_with_id(10).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_cargo_by_id(&new_id);
-        assert!(result.is_ok());
-
-        let &found_cargo = result.unwrap();
-        assert_eq!(13, found_cargo);
-    }
-
-    #[test]
-    fn node_with_id_borrow_mut_cargo_by_id() {
-        let mut n = Node::new_with_id(10u8).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        {
-            let result = n.borrow_mut_cargo_by_id(&new_id);
-            assert!(result.is_ok());
-
-            let found_cargo = result.unwrap();
-            assert_eq!(&13u8, found_cargo);
-
-            *found_cargo = 200;
-        }
-
-        let result2 = n.borrow_cargo_by_id(&new_id);
-        assert!(result2.is_ok());
-        assert_eq!(&200u8, result2.unwrap());
-    }
-
-    #[test]
-    fn node_with_id_borrow_node_and_get_path_by_id() {
-        let mut n = Node::new_with_id(10).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_node_and_get_path_by_id(&new_id);
-        assert!(result.is_ok());
-
-        let (found_node, found_path) = result.unwrap();
-        assert_eq!(13, found_node.cargo.subcargo);
-        assert_eq!(vec![1, 0], found_path);
-    }
-
-    #[test]
-    fn node_with_id_borrow_mut_node_and_get_path_by_id() {
-        let mut n = Node::new_with_id(10u8).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        {
-            let result = n.borrow_mut_node_and_get_path_by_id(&new_id);
-            assert!(result.is_ok());
-
-            let (found_node, found_path) = result.unwrap();
-            assert_eq!(13, found_node.cargo.subcargo);
-            assert_eq!(vec![1, 0], found_path);
-
-            found_node.cargo.subcargo = 100u8;
-        }
-
-        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
-        assert!(result2.is_ok());
-        let (found_cargo2, found_path2) = result2.unwrap();
-        assert_eq!(&100u8, found_cargo2);
-        assert_eq!(vec![1, 0], found_path2);
-    }
-
-    #[test]
-    fn node_with_id_borrow_node_by_id() {
-        let mut n = Node::new_with_id(10).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        let result = n.borrow_node_by_id(&new_id);
-        assert!(result.is_ok());
-
-        let found_node = result.unwrap();
-        assert_eq!(13, found_node.cargo.subcargo);
-    }
-
-    #[test]
-    fn node_with_id_borrow_mut_node_by_id() {
-        let mut n = Node::new_with_id(10u8).unwrap();
-        let root_path = vec![];
-        n.add_cargo_under_path_with_id(&root_path, 11).unwrap();
-        n.add_cargo_under_path_with_id(&root_path, 12).unwrap();
-        let new_id = n.add_cargo_under_path_with_id(&vec![1], 13).unwrap().1;
-
-        {
-            let result = n.borrow_mut_node_by_id(&new_id);
-            assert!(result.is_ok());
-
-            let found_node = result.unwrap();
-            assert_eq!(13, found_node.cargo.subcargo);
-
-            found_node.cargo.subcargo = 100u8;
-        }
-
-        let result2 = n.borrow_cargo_and_get_path_by_id(&new_id);
-        assert!(result2.is_ok());
-        let (found_cargo2, found_path2) = result2.unwrap();
-        assert_eq!(&100u8, found_cargo2);
-        assert_eq!(vec![1, 0], found_path2);
-    }
-
-    #[test]
-    fn node_with_id_get_path_to_id_on_lone_root() {
-        let n = Node::new_with_id(true).unwrap();
-        let new_id = n.get_id();
-        
-        let path_result = n.get_path_to_id(&new_id);
-        assert!(path_result.is_ok());
-
-        let path_to_id = path_result.unwrap();
-        assert_eq!(Vec::<usize>::new(), path_to_id);
-    }
-
-    #[test]
-    fn node_with_id_get_path_to_id() {
-        let mut n = Node::new_with_id(true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], true).unwrap();
-        let (new_path, new_id) = n.add_cargo_under_path_with_id(&vec![2], false).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], true).unwrap();
-        
-        let path_result = n.get_path_to_id(&new_id);
-        assert!(path_result.is_ok());
-
-        let path_to_id = path_result.unwrap();
-        assert_eq!(new_path, path_to_id);
-        assert_eq!(false, n.borrow_cargo(&path_to_id).unwrap().subcargo);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_under_id() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 2).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 3).unwrap();
-        let (_, new_id) = n.add_cargo_under_path_with_id(&vec![2], 4).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], 5).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], 6).unwrap();
-        
-        let result = n.add_cargo_under_id(&new_id, 7);
-        assert!(result.is_ok());
-
-        let (path_to_id, _) = result.unwrap();
-        assert_eq!(vec![2usize, 0usize, 0usize], path_to_id);
-        assert_eq!(7u8, n.borrow_cargo(&path_to_id).unwrap().subcargo);
-    }
-
-    #[test]
-    fn node_with_id_add_cargo_under_nonexistent_id() {
-        let mut n = Node::new_with_id(0u8).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 1).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 2).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], 3).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], 5).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], 6).unwrap();
-        let (_, new_id) = n.add_cargo_under_path_with_id(&vec![2], 4).unwrap();
-        
-        let result = n.add_cargo_under_id(&(new_id + 10), 7);
-        assert!(result.is_err());
-
-        let (err, bounced_cargo) = result.unwrap_err();
-        assert_eq!(PathError::InputIdNotFound, err);
-        assert_eq!(7, bounced_cargo);
-    }
-
-    #[test]
-    fn node_with_id_get_path_to_nonexistent_id() {
-        let mut n = Node::new_with_id(true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], true).unwrap();
-        n.add_cargo_under_path_with_id(&vec![2], true).unwrap();
-        let (_, new_id) = n.add_cargo_under_path_with_id(&vec![2], false).unwrap();
-        
-        let path_result = n.get_path_to_id(&(new_id + 10));
-        assert!(path_result.is_err());
-        assert_eq!(PathError::InputIdNotFound, path_result.unwrap_err());
     }
 
     // Testing some assumptions about vector comparisons.
