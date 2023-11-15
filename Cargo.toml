@@ -4,7 +4,14 @@ version = "1.0.0"
 edition = "2021"
 description = "A tree data structure featuring nodes addressable using a &Vec<usize> path and avoiding recursion and run-time borrow checking."
 license = "MIT OR Apache-2.0"
+authors = ["Koen Bekx <klbekx@gmail.com>"]
+categories = ["data-structures"]
+keywords = ["datastructure", "tree"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[badges]
+maintenance = { status = "passively-maintained" }

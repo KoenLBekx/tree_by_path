@@ -1,16 +1,4 @@
 //{ Documentation
-//! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
-//! who in turn may or may not have other `Node<C>` children etc.
-//!
-//! Every node carries a useful cargo of generic type C ("cargo"). (Nullability of the cargo can be
-//! obtained by instantiating `Node<Option<Whatever>>` nodes.)
-//!
-//! Child nodes are directly owned by parent nodes as elements of their children vector :
-//! `Vec<Node<C>>`.
-//!
-//! Child nodes hold no reference to their parent. This parent, however, can always be retrieved by
-//! removing the last element of the indexes array the node has been addressed with - see below.
-//!
 //! ```
 //! pub struct Node<C> {
 //!     pub cargo: C,
@@ -18,8 +6,22 @@
 //! }
 //! ```
 //!
-//! This design has been chosen so as to avoid the use of RefCell or other inner mutability mechanisms, which defer borrow checking
+//! tree_by_path trees consist of a `Node<C>` root node that may or may not have `Node<C>` children,
+//! who in turn may or may not have other `Node<C>` children etc.
+//!
+//! Every node carries a useful cargo of generic type C ("cargo"). (Nullability of the cargo can be
+//! obtained by instantiating a tree having `Node<Option<YourType>>` nodes.)
+//!
+//! Child nodes are directly owned by parent nodes as elements of their children vector :
+//! `Vec<Node<C>>`.
+//!
+//! Child nodes hold no reference to their parent. This parent, however, can always be retrieved by
+//! removing the last element of the indexes array the node has been addressed with - see below.
+//!
+//! This design has been chosen so as to avoid the use of `RefCell` or other inner mutability mechanisms, which defer borrow checking
 //! from compilation to runtime.
+//!
+//! ## Address paths
 //!
 //! Except for the root node, all nodes in the tree are an n-th element in their parent node's
 //! children collection.
@@ -50,9 +52,104 @@
 //! So, instead of references to nodes, instances of `Vec<usize>` paths can be kept in variables.
 //!
 //! And even if these path addresses can become obsolete after insertion or removal of nodes,
-//! specific nodes can be retrieved by lookups on the nodes' cargo using the `traverse*` methods if needed.
+//! specific nodes can be retrieved by lookups on the nodes' cargo
+//! using the `traverse*` methods if needed - see the section [Node identifiers](#node-identifiers).
 //!
-//! # Node identifiers
+//! # Cloning
+//! `Node<C>` is clonable if type `C` is clonable :
+//! ```
+//! use tree_by_path::Node;
+//! let n = Node::new(20u8);
+//! let mut nc = n.clone();
+//! let root_path = n.get_first_path();
+//! let cloned_cargo = nc.borrow_mut_cargo(&root_path).unwrap();
+//! *cloned_cargo = 21u8;
+//! assert_eq!(&20u8, n.borrow_cargo(&root_path).unwrap());
+//! assert_eq!(&21u8, nc.borrow_cargo(&root_path).unwrap());
+//! ```
+//!
+//! Cloning a `Node<C>` instance having a non-clonable cargo, however, will cause a compilation error :
+//! ```compile_fail
+//! use tree_by_path::Node;
+//!
+//! #[derive(Debug)]
+//! struct NoClone {}
+//! 
+//! let mut n = Node::new(NoClone{});
+//! n.add_cargo_under_path(&Vec::<usize>::new(), NoClone{}).unwrap();
+//! 
+//! // The below statement doesn't even compile :
+//! let nc = n.clone();
+//! ```
+//!
+//! ## Examples
+//! ```
+//! use tree_by_path::{Node, PathError, TraverseAction};
+//!
+//! let mut n = Node::new(0i8);
+//! let mut result: Result<Vec<usize>, (PathError, i8)>;
+//! let mut result_path: Vec<usize>;
+//! 
+//! // Adding a node with specified cargo after a node which doesn't exist yet :
+//! result = n.add_cargo_after_path(&vec![0], 1);
+//! assert!(result.is_err());
+//! assert_eq!((PathError::RequestedPathNotAvailable, 1), result.unwrap_err());
+//! 
+//! // Now we create a node that will have address [0] :
+//! result = n.add_cargo_under_path(&vec![], 1);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![0], result_path);
+//! 
+//! // So now we can add a node after the one having address [0] :
+//! result = n.add_cargo_after_path(&vec![0], 2);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![1], result_path);
+//! assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
+//! 
+//! result = n.add_cargo_after_path(&vec![0], 3);
+//! assert!(result.is_ok());
+//! result_path = result.unwrap();
+//! assert_eq!(vec![1], result_path);
+//! assert_eq!(&3, n.borrow_cargo(&result_path).unwrap());
+//! assert_eq!(&2, n.borrow_cargo(&vec![2]).unwrap());
+//!
+//! // Traversing the cargoes of all nodes can be done using the iter() method :
+//! let mut sum = n.iter().fold(
+//!     0i8,
+//!     |mut accum, &crg| {
+//!         accum += crg;
+//!         accum
+//!     }
+//! );
+//!
+//! assert_eq!(6i8, sum);
+//!
+//! // However, the traverse* methods runs somewhat faster.
+//! // Moreover, traverse_mut offers mutable access to the nodes :
+//! n.traverse_mut(
+//!     0i8,
+//!     |_acc, nd, _path| {
+//!         nd.cargo *= 2i8;
+//!         TraverseAction::Continue
+//!     }
+//! );
+//!
+//! assert_eq!(&4, n.borrow_cargo(&vec![2]).unwrap());
+//!
+//! sum = n.traverse(
+//!     0i8,
+//!     |acc, nd, _path| {
+//!         *acc += nd.cargo;
+//!         TraverseAction::Continue
+//!     }
+//! );
+//!
+//! assert_eq!(12i8, sum);
+//! ```
+//!
+//! ## Node identifiers
 //!
 //! Another way of keeping track of specific nodes could be having cargoes of a custom type that holds an
 //! identifier number or string together with other content, and looking for the nodes using one of
@@ -61,7 +158,7 @@
 //! ```
 //! use tree_by_path::{Node, TraverseAction};
 //!
-//! // The custom cargo type needs an enum.
+//! // The example's custom cargo type needs an enum.
 //! #[derive(Clone, Debug)]
 //! enum HtmlPart {
 //!     Main,
@@ -71,7 +168,7 @@
 //!     Data(String),
 //! }
 //!
-//! // The custom cargo type, having an identifier property.
+//! // The example's custom cargo type, having an identifier property.
 //! #[derive(Clone, Debug)]
 //! struct HtmlCargo {
 //!     id: u32,
@@ -86,7 +183,7 @@
 //!     }
 //! }
 //!
-//! // Let's create a rough general HTML page,
+//! // Let's create a rough general HTML page tree,
 //! // thereby keeping track of the id of the page title node and the
 //! // main content section node:
 //! let mut general_page = Node::new(HtmlCargo::new(0, HtmlPart::Main));
@@ -139,7 +236,8 @@
 //! // Let's clone the general page skeleton in order to make a custom page.
 //! let mut custom_page_welcome = general_page.clone();
 //!
-//! // Let's look for the node of the title tag by title_tag_id and add a title text if found.
+//! // Let's look for the node of the title tag by title_tag_id
+//! // and add a title text if found.
 //! let title_tag_found = custom_page_welcome.traverse_mut(
 //!     false,
 //!     |is_found, node, path| {
@@ -194,101 +292,6 @@
 //!
 //! // Using another custom_page_welcome.traverse call,
 //! // the very HTML string for the custom page could be created.
-//! ```
-//!
-//! # Cloning
-//! `Node<C>` is clonable if type `C` is clonable :
-//! ```
-//! use tree_by_path::Node;
-//! let n = Node::new(20u8);
-//! let mut nc = n.clone();
-//! let root_path = n.get_first_path();
-//! let cloned_cargo = nc.borrow_mut_cargo(&root_path).unwrap();
-//! *cloned_cargo = 21u8;
-//! assert_eq!(&20u8, n.borrow_cargo(&root_path).unwrap());
-//! assert_eq!(&21u8, nc.borrow_cargo(&root_path).unwrap());
-//! ```
-//!
-//! Cloning a `Node<C>` instance having a non-clonable cargo, however, will cause a compilation error :
-//! ```compile_fail
-//! use tree_by_path::Node;
-//!
-//! #[derive(Debug)]
-//! struct NoClone {}
-//! 
-//! let mut n = Node::new(NoClone{});
-//! n.add_cargo_under_path(&Vec::<usize>::new(), NoClone{}).unwrap();
-//! 
-//! // The below statement doesn't even compile :
-//! let nc = n.clone();
-//! ```
-//!
-//! # Example :
-//! ```
-//! use tree_by_path::{Node, PathError, TraverseAction};
-//!
-//! let mut n = Node::new(0i8);
-//! let mut result: Result<Vec<usize>, (PathError, i8)>;
-//! let mut result_path: Vec<usize>;
-//! 
-//! // Adding a node with specified cargo after a node which doesn't exist yet :
-//! result = n.add_cargo_after_path(&vec![0], 1);
-//! assert!(result.is_err());
-//! assert_eq!((PathError::RequestedPathNotAvailable, 1), result.unwrap_err());
-//! 
-//! // Now we create a node that will have address [0] :
-//! result = n.add_cargo_under_path(&vec![], 1);
-//! assert!(result.is_ok());
-//! result_path = result.unwrap();
-//! assert_eq!(vec![0], result_path);
-//! 
-//! // So now we can add a node after the one having address [0] :
-//! result = n.add_cargo_after_path(&vec![0], 2);
-//! assert!(result.is_ok());
-//! result_path = result.unwrap();
-//! assert_eq!(vec![1], result_path);
-//! assert_eq!(&2, n.borrow_cargo(&result_path).unwrap());
-//! 
-//! result = n.add_cargo_after_path(&vec![0], 3);
-//! assert!(result.is_ok());
-//! result_path = result.unwrap();
-//! assert_eq!(vec![1], result_path);
-//! assert_eq!(&3, n.borrow_cargo(&result_path).unwrap());
-//! assert_eq!(&2, n.borrow_cargo(&vec![2]).unwrap());
-//!
-//! // Traversing the cargoes of all nodes can be done using the iter() method :
-//! let mut sum = n.iter().fold(
-//!     0i8,
-//!     |mut accum, &crg| {
-//!         accum += crg;
-//!         accum
-//!     }
-//! );
-//!
-//! assert_eq!(6i8, sum);
-//!
-//! // However, the traverse_mut method runs somewhat faster
-//! // and offers mutable access to the nodes :
-//! n.traverse_mut(
-//!     0i8,
-//!     |_acc, nd, _path| {
-//!         nd.cargo *= 2i8;
-//!         TraverseAction::Continue
-//!     }
-//! );
-//!
-//! assert_eq!(&4, n.borrow_cargo(&vec![2]).unwrap());
-//!
-//! sum = n.traverse(
-//!     0i8,
-//!     |acc, nd, _path| {
-//!         *acc += nd.cargo;
-//!         TraverseAction::Continue
-//!     }
-//! );
-//!
-//! assert_eq!(12i8, sum);
-//!
 //! ```
 //}
 
