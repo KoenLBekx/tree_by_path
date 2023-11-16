@@ -1,4 +1,5 @@
 # tree_by_path
+*by Koen Bekx*
 
 ## Usage
 
@@ -73,6 +74,11 @@ So, instead of references to nodes, instances of `Vec<usize>` paths can be kept 
 And even if these path addresses can become obsolete after insertion or removal of nodes,
 specific nodes can be retrieved by lookups on the nodes' cargo
 using the `traverse*` methods if needed - see the section *Node identifiers* in the crate's documentation.
+
+## Cyclic parent-child node ownership 
+                                                                      
+No way has been found to force a node to have one of its parent nodes
+as a child node in its children vector, and that's for the better.
 
 ## Cloning
 `Node<C>` is clonable if type `C` is clonable.

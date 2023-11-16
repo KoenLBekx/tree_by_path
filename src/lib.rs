@@ -82,6 +82,36 @@
 //! let nc = n.clone();
 //! ```
 //!
+//! ## Cyclic parent-child node ownership 
+//!
+//! No way has been found to force a node to have one of its parent nodes
+//! as a child node in its children vector, and that's for the better.
+//!
+//! The below code fails to compile:
+//!
+//! ```compile_fail
+//! use tree_by_path::Node;
+//!
+//! let mut root = Node::new(0u32);
+//! let mut last_path = root.add_cargo_under_path(&vec![], 1).unwrap();
+//! last_path = root.add_cargo_under_path(&last_path, 2).unwrap();
+//! let last_node = root.borrow_mut_node(&last_path).unwrap();
+//!
+//! let result = last_node.add_node_under_path(&vec![], root);
+//!
+//! // error[E0505]: cannot move out of `root` because it is borrowed
+//! // 
+//! // let mut root = Node::new(0u32);
+//! //     -------- binding `root` declared here
+//! // 
+//! // let last_node = root.borrow_mut_node(&last_path).unwrap();
+//! //                 ---- borrow of `root` occurs here
+//! // let result = last_node.add_node_under_path(&vec![], root);
+//! //                        -------------------          ^^^^ move out of `root` occurs here
+//! //                        |
+//! //                        borrow later used by call
+//! ```
+//!
 //! ## Examples
 //! ```
 //! use tree_by_path::{Node, PathError, TraverseAction};
