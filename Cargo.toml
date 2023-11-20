@@ -8,6 +8,9 @@ authors = ["Koen Bekx <klbekx@gmail.com>"]
 categories = ["data-structures"]
 keywords = ["datastructure", "tree"]
 readme = "README.md"
+repository = "https://github.com/KoenLBekx/tree_by_path"
+homepage = "https://github.com/KoenLBekx/tree_by_path"
+documentation = "https://docs.rs/tree_by_path"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
