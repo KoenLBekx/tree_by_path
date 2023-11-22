@@ -1,6 +1,6 @@
 [package]
 name = "tree_by_path"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "A tree data structure featuring nodes addressable using a &Vec<usize> path and avoiding recursion and run-time borrow checking."
 license = "MIT OR Apache-2.0"

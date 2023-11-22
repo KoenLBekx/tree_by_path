@@ -371,6 +371,12 @@ pub struct Node<C> {
     pub children: Vec<Node<C>>,
 }
 
+/// If `Node<C>::swap_cargo` succeeds, it returns<br />
+/// `Ok<(node_parameter_moved_back_out, previous_cargo)`.
+/// Otherwise, it returns
+/// `Err<(PathError, node_parameter_moved_back_out, new_cargo_moved_back_out>`.
+pub type CargoSwapResult<C> = Result<(Node<C>, C), (PathError, Node<C>, C)>;
+
 impl<C> Node<C> {
     // { Documentation
     /// Creates a new node and immediately also a new tree having a single (root) node.
@@ -383,7 +389,7 @@ impl<C> Node<C> {
     // }
     pub fn new(cargo: C) -> Node<C> {
         Node {
-            cargo: cargo,
+            cargo,
             children: Vec::<Node<C>>::new(),
         }
     }
@@ -448,13 +454,13 @@ impl<C> Node<C> {
     /// assert_eq!(Ok(antwerp_path.clone()), n.get_next_path(&ghent_path));
     /// ```
     // }
-    pub fn get_next_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
-        let mut result_path = path.clone();
+    pub fn get_next_path(&self, path: &[usize]) -> Result<Vec<usize>, PathError> {
+        let mut result_path = path.to_owned();
 
         match self.borrow_node(&result_path) {
             Err(err) => Err(err),
             Ok(nd) => {
-                if nd.children.len() > 0 {
+                if !nd.children.is_empty() {
                     result_path.push(0);
                     Ok(result_path)
                 } else {
@@ -464,7 +470,7 @@ impl<C> Node<C> {
                     let mut next_node_index: usize;
 
                     loop {
-                        if result_path.len() == 0 {
+                        if result_path.is_empty() {
                             break Err(PathError::RequestedPathNotAvailable);
                         }
 
@@ -495,7 +501,7 @@ impl<C> Node<C> {
     /// Note that `Node.traverse_back` internally uses this method.
     // }
     pub fn get_previous_path(&self, path: &Vec<usize>) -> Result<Vec<usize>, PathError> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err(PathError::RequestedPathNotAvailable);
         }
 
@@ -607,7 +613,7 @@ impl<C> Node<C> {
     /// as a tree's root node can't have siblings.
     // }
     pub fn add_cargo_after_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err((PathError::InputPathNotFitForOperation, cargo));
         }
 
@@ -644,7 +650,7 @@ impl<C> Node<C> {
     /// as a tree's root node can't have siblings.
     // }
     pub fn add_cargo_before_path(&mut self, path: &Vec<usize>, cargo: C) -> Result<Vec<usize>, (PathError, C)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err((PathError::InputPathNotFitForOperation, cargo));
         }
 
@@ -715,7 +721,7 @@ impl<C> Node<C> {
     /// ```
     // }
     pub fn extract_node(&mut self, path: &Vec<usize>) -> Result<Node<C>, PathError> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err(PathError::InputPathNotFitForOperation);
         }
 
@@ -809,7 +815,7 @@ impl<C> Node<C> {
     /// as a tree's root node can't have siblings.
     // }
     pub fn add_node_after_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err((PathError::InputPathNotFitForOperation, node));
         }
 
@@ -846,7 +852,7 @@ impl<C> Node<C> {
     /// as a tree's root node can't have siblings.
     // }
     pub fn add_node_before_path(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Vec<usize>, (PathError, Node<C>)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err((PathError::InputPathNotFitForOperation, node));
         }
 
@@ -885,7 +891,7 @@ impl<C> Node<C> {
     /// cargo.
     // }
     pub fn swap_node(&mut self, path: &Vec<usize>, node: Node<C>) -> Result<Node<C>, (PathError, Node<C>)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Err((PathError::InputPathNotFitForOperation, node));
         }
 
@@ -1105,12 +1111,12 @@ impl<C> Node<C> {
     /// assert_eq!('a', new_cargo);
     /// ```
     // }
-    pub fn swap_cargo(mut tree_root: Node<C>, path: &Vec<usize>, cargo: C) -> Result<(Node<C>, C), (PathError, Node<C>, C)> {
+    pub fn swap_cargo(mut tree_root: Node<C>, path: &Vec<usize>, cargo: C) -> CargoSwapResult<C> {
 
         fn transfer_children<C>(source: &mut Node<C>, target: &mut Node<C>) -> Result<(), PathError> {
             let mut child: Node<C>;
 
-            while source.children.len() > 0 {
+            while !source.children.is_empty() {
                 child = match source.children.pop() {
                     Some(ch) => ch,
                     None => return Err(
@@ -1127,7 +1133,7 @@ impl<C> Node<C> {
         }
 
         let mut new_node = Node::new(cargo);
-        let is_swap_from_root = path.len() == 0;
+        let is_swap_from_root = path.is_empty();
 
         if is_swap_from_root {
             match transfer_children(&mut tree_root, &mut new_node) {
@@ -1238,7 +1244,7 @@ impl<C> Node<C> {
                     // Go to last child of last child of ... of current node
                     // thus effectively causing all children of current node
                     // to be skipped.
-                    while current_node.children.len() > 0 {
+                    while !current_node.children.is_empty() {
                         last_child_index = current_node.children.len() - 1;
                         current_path.push(last_child_index);
                         current_node = &current_node.children[last_child_index];
@@ -1325,7 +1331,7 @@ impl<C> Node<C> {
                     // Go to last child of last child of ... of current node
                     // thus effectively causing all children of current node
                     // to be skipped.
-                    while current_node.children.len() > 0 {
+                    while !current_node.children.is_empty() {
                         last_child_index = current_node.children.len() - 1;
                         current_path.push(last_child_index);
                         current_node = &mut current_node.children[last_child_index];
@@ -1556,7 +1562,7 @@ pub struct NodeIterator<'it, C> {
 impl<'it, C> NodeIterator<'it, C> {
     pub fn new(root: &'it Node<C>) -> NodeIterator<'it, C> {
         NodeIterator {
-            root: root,
+            root,
             current_path: Vec::<usize>::new(),
             is_fresh: true,
             back_current_path: root.get_last_path(),
@@ -1582,13 +1588,11 @@ impl<'it, C> NodeIterator<'it, C> {
         if self.get_freshness(is_forward) {
             self.set_unfresh(is_forward);
         } else { 
-            let next_path_result: Result<Vec<usize>, PathError>;
-
-            if is_forward {
-                next_path_result = self.root.get_next_path(&self.current_path);
+            let next_path_result: Result<Vec<usize>, PathError> = if is_forward {
+                self.root.get_next_path(&self.current_path)
             } else {
-                next_path_result = self.root.get_previous_path(&self.back_current_path);
-            }
+                self.root.get_previous_path(&self.back_current_path)
+            };
 
             match next_path_result {
                 Ok(next_path) => {
