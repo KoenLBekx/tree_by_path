@@ -372,9 +372,9 @@ pub struct Node<C> {
 }
 
 /// If `Node<C>::swap_cargo` succeeds, it returns<br />
-/// `Ok<(node_parameter_moved_back_out, previous_cargo)`.
-/// Otherwise, it returns
-/// `Err<(PathError, node_parameter_moved_back_out, new_cargo_moved_back_out>`.
+/// `Ok<(node_parameter_moved_back_out, previous_cargo)`.<br />
+/// Otherwise, it returns<br />
+/// `Err<(PathError, node_parameter_moved_back_out, new_cargo_moved_back_out)>`.
 pub type CargoSwapResult<C> = Result<(Node<C>, C), (PathError, Node<C>, C)>;
 
 impl<C> Node<C> {
